@@ -1,0 +1,15 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+}
+
+#info {
+    position: absolute;
+    color: white;
+    width: 100%;
+    text-align: center;
+    top: 20px;
+    font-family: Arial;
+    z-index: 100;
+}

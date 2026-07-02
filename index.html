@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport-fit=cover + user-scalable=no: imprescindible para jugabilidad tactil en celular -->
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#000000" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Simulador Mina Subterranea — Cerro Lindo</title>
+  <link rel="stylesheet" href="/src/ui/styles.css" />
+</head>
+<body>
+  <!-- Lienzo principal de Three.js (lo gestiona Renderer.js) -->
+  <div id="app"></div>
+
+  <!-- Capa de interfaz (HUD + controles tactiles); la rellena el modulo ui/ -->
+  <div id="ui-layer"></div>
+
+  <!-- Pantalla de carga / arranque (se oculta cuando el Engine termina de inicializar) -->
+  <div id="boot-screen">
+    <div class="boot-box">
+      <h1>UNIDAD MINERA CERRO LINDO</h1>
+      <p class="boot-sub">NV-1600 · CX.081 · NEXA / AESA</p>
+
+      <div class="config">
+        <div class="cfg-group">
+          <span class="cfg-label">Nivel de condiciones inseguras</span>
+          <div class="cfg-chips" id="cfg-inseguridad"></div>
+          <p class="cfg-hint">Más desorden (material botado), más huecos, rocas y mallas sobresalidas, fisuras y peligros.</p>
+        </div>
+        <div class="cfg-group">
+          <span class="cfg-label">Calidad gráfica</span>
+          <div class="cfg-chips" id="cfg-calidad"></div>
+        </div>
+      </div>
+
+      <p id="boot-status"></p>
+
+      <div class="boot-actions">
+        <button id="boot-start">INGRESAR A LA MINA</button>
+        <a href="/visor.html" class="boot-visor">VER ELEMENTOS</a>
+      </div>
+
+      <p class="boot-hint">Recomendado: pantalla horizontal en celular · audio activado</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

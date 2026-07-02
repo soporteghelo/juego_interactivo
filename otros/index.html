@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Mina 3D</title>
+
+  <style>
+    body{
+      margin:0;
+      overflow:hidden;
+      background:black;
+    }
+
+    #app{
+      width:100vw;
+      height:100vh;
+    }
+
+    #info{
+      position:absolute;
+      top:20px;
+      width:100%;
+      text-align:center;
+      color:white;
+      font-family:Arial;
+      z-index:100;
+    }
+  </style>
+</head>
+<body>
+
+<div id="info">
+  W A S D para moverse
+</div>
+
+<div id="app"></div>
+
+<script type="module" src="game.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,570 @@
+/* ============================================================================
+   Estilos de interfaz del simulador de mina.
+   Diseno responsive: misma UI en escritorio y celular. Targets tactiles grandes,
+   uso de 100dvh para la barra de URL movil, y prevencion de gestos de scroll/zoom.
+   Paleta coherente con el md: negro de mina, verde neon, naranja EPP, amarillo aviso.
+   ============================================================================ */
+
+:root {
+  --verde-neon: #39ff14;
+  --naranja-epp: #ff6600;
+  --amarillo-aviso: #ffcc00;
+  --rojo-peligro: #cc0000;
+  --azul-epp: #0d47a1;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  color: #e8f0ff;
+  /* Evita seleccion/zoom/scroll por gestos tactiles durante el juego. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+#app, #ui-layer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh; /* respeta la barra de URL en moviles */
+}
+
+#app canvas { display: block; }
+
+/* La capa de UI no captura clicks salvo en sus controles concretos. */
+#ui-layer { pointer-events: none; z-index: 10; }
+#ui-layer > * { pointer-events: auto; }
+
+/* ----------------------------- Portada / boot ---------------------------- */
+#boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, #0a0f0a 0%, #000 70%);
+  transition: opacity 0.6s ease;
+}
+#boot-screen.hidden { opacity: 0; pointer-events: none; }
+
+.boot-box { text-align: center; padding: 24px; max-width: 90vw; }
+.boot-box h1 {
+  font-size: clamp(1.2rem, 4vw, 2.4rem);
+  letter-spacing: 0.12em;
+  color: #fff;
+  margin: 0 0 8px;
+  text-shadow: 0 0 18px rgba(57, 255, 20, 0.45);
+}
+.boot-sub { color: var(--verde-neon); letter-spacing: 0.2em; margin: 0 0 28px; font-size: 0.85rem; }
+#boot-status { color: #9aa6b2; min-height: 1.4em; margin: 12px 0; font-size: 0.95rem; }
+.boot-hint { color: #5a6470; font-size: 0.75rem; margin-top: 20px; }
+
+/* Menu de configuracion de la portada */
+.config { margin: 8px auto 4px; max-width: 460px; text-align: left; }
+.cfg-group { margin: 14px 0; }
+.cfg-label { display: block; font-size: 0.8rem; letter-spacing: 0.06em; color: #9fb0c2; margin-bottom: 8px; text-transform: uppercase; }
+.cfg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.cfg-chip {
+  padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.85rem;
+  background: #11151a; border: 1px solid #2c333c; color: #c8d2dc; transition: all 0.12s ease;
+}
+.cfg-chip:hover { border-color: #4a5662; }
+.cfg-chip.activo { background: rgba(57,255,20,0.18); border-color: #39ff14; color: #39ff14; font-weight: 700; }
+.cfg-hint { font-size: 0.74rem; color: #6a7480; margin: 8px 0 0; }
+
+/* Contenedor de botones de la pantalla de inicio */
+.boot-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+#boot-start {
+  padding: 14px 34px;
+  font-size: 1.05rem;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  color: #001b00;
+  background: var(--verde-neon);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+  max-width: 300px;
+  box-shadow: 0 0 24px rgba(57, 255, 20, 0.55);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+#boot-start:hover { transform: translateY(-2px); box-shadow: 0 0 34px rgba(57, 255, 20, 0.8); }
+#boot-start:active { transform: translateY(0); }
+
+/* Boton secundario: visualizador de elementos */
+.boot-visor {
+  display: inline-block;
+  padding: 10px 28px;
+  width: 100%;
+  max-width: 300px;
+  font-size: 0.88rem;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  text-align: center;
+  color: var(--verde-neon);
+  background: transparent;
+  border: 1px solid rgba(57, 255, 20, 0.38);
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.boot-visor:hover {
+  background: rgba(57, 255, 20, 0.08);
+  border-color: rgba(57, 255, 20, 0.75);
+  box-shadow: 0 0 14px rgba(57, 255, 20, 0.28);
+}
+.boot-visor:active {
+  background: rgba(57, 255, 20, 0.15);
+}
+
+/* -------------------------------- HUD ------------------------------------ */
+.hud-crosshair {
+  position: fixed;
+  left: 50%; top: 50%;
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: rgba(232, 240, 255, 0.55);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+  z-index: 12;
+}
+
+.hud-stats {
+  position: fixed;
+  top: env(safe-area-inset-top, 8px); left: 10px;
+  font-size: 0.72rem;
+  color: #7fd87f;
+  font-family: 'Consolas', monospace;
+  text-shadow: 0 1px 2px #000;
+  z-index: 12;
+}
+
+.hud-prompt {
+  position: fixed;
+  left: 50%; bottom: 22%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid var(--amarillo-aviso);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 13;
+}
+.hud-prompt.visible { opacity: 1; }
+.hud-prompt .key {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border: 1px solid #888;
+  border-radius: 3px;
+  background: #1a1a1a;
+  font-family: monospace;
+}
+
+/* Panel de lectura (senales / tableros / procedimientos). */
+.hud-reader {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 40;
+}
+.hud-reader.visible { display: grid; }
+.hud-reader .reader-card {
+  max-width: min(620px, 92vw);
+  max-height: 80dvh;
+  overflow: auto;
+  background: #14171c;
+  border: 1px solid #333;
+  border-left: 5px solid var(--verde-neon);
+  border-radius: 6px;
+  padding: 22px 26px;
+}
+.hud-reader h2 { margin: 0 0 12px; color: var(--amarillo-aviso); letter-spacing: 0.05em; }
+.hud-reader p { line-height: 1.55; color: #c8d2dc; }
+.hud-reader .reader-close {
+  margin-top: 18px; padding: 10px 20px; cursor: pointer;
+  background: #2a2f36; color: #fff; border: 1px solid #444; border-radius: 4px;
+}
+
+/* ----------------------- Advertencia de peligro -------------------------- */
+.hud-warning {
+  position: fixed;
+  left: 50%; top: 14%;
+  transform: translateX(-50%);
+  max-width: 80vw;
+  padding: 12px 22px;
+  background: rgba(140, 0, 0, 0.82);
+  border: 2px solid #ffcc00;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+  box-shadow: 0 0 22px rgba(204, 0, 0, 0.7);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 45;
+  animation: warnpulse 0.9s ease-in-out infinite;
+}
+.hud-warning.visible { opacity: 1; }
+@keyframes warnpulse { 0%,100% { box-shadow: 0 0 18px rgba(204,0,0,0.6); } 50% { box-shadow: 0 0 34px rgba(255,80,0,0.95); } }
+
+/* ----------------------------- Muerte ------------------------------------ */
+.hud-death {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, rgba(60,0,0,0.92), rgba(0,0,0,0.97));
+  z-index: 80;
+}
+.hud-death.visible { display: grid; }
+.death-card { max-width: min(620px, 92vw); text-align: center; padding: 30px; }
+.death-card h1 {
+  margin: 0; font-size: clamp(2rem, 8vw, 4rem); letter-spacing: 0.15em; color: #ff2b2b;
+  text-shadow: 0 0 26px rgba(255, 0, 0, 0.7);
+}
+.death-sub { color: #ffcc00; letter-spacing: 0.2em; margin: 6px 0 24px; text-transform: uppercase; font-size: 0.9rem; }
+.death-reflexion { color: #e8e0d8; line-height: 1.6; font-size: 1.05rem; }
+.death-count { color: #9aa6b2; margin-top: 22px; font-size: 0.9rem; }
+.death-restart {
+  margin-top: 16px; padding: 12px 30px; font-size: 1rem; font-weight: 700; letter-spacing: 0.1em;
+  color: #1a0000; background: #ff2b2b; border: none; border-radius: 6px; cursor: pointer;
+  box-shadow: 0 0 22px rgba(255, 43, 43, 0.6);
+}
+.death-restart:hover { background: #ff5050; }
+
+/* --------------------------- Controles tactiles -------------------------- */
+.touch-joystick {
+  position: fixed;
+  left: 5%; bottom: 8%;
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  z-index: 20;
+  touch-action: none;
+}
+.touch-joystick .stick {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 56px; height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(57, 255, 20, 0.3);
+  border: 2px solid var(--verde-neon);
+  pointer-events: none;
+}
+
+.touch-buttons {
+  position: fixed;
+  right: 4%; bottom: 7%;
+  display: grid;
+  grid-template-columns: repeat(2, 72px);
+  gap: 12px;
+  z-index: 20;
+}
+.touch-btn {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(232, 240, 255, 0.35);
+  color: #e8f0ff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: grid; place-items: center;
+  touch-action: none;
+}
+.touch-btn:active,
+.touch-btn.active { background: rgba(57, 255, 20, 0.25); border-color: var(--verde-neon); }
+.touch-btn.wide { grid-column: span 2; width: auto; border-radius: 36px; height: 56px; }
+
+/* ─────────────── Banner ZONA PROHIBIDA (ambar constante) ──────── */
+
+/*
+ * Se muestra mientras el jugador este dentro del radio de una zona prohibida.
+ * Ambar solido sin parpadeo — diferencia de la advertencia de vehiculos (rojo pulsante).
+ */
+.hud-zona {
+  position: fixed;
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  max-width: 88vw;
+  padding: 11px 24px;
+  background: rgba(140, 80, 0, 0.90);
+  border: 2px solid #ffaa00;
+  border-radius: 6px;
+  color: #fff8e8;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  z-index: 44;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.hud-zona.visible { opacity: 1; }
+
+/* ─────────────── Flash de HERIDA (no fatal) ───────────────────── */
+
+/*
+ * Especificidad alta necesaria: '#ui-layer > * { pointer-events: auto }' anula
+ * las declaraciones de clase sola. Estos elementos son solo visuales y nunca
+ * deben interceptar clics ni toques (de lo contrario bloquean el pointer-lock
+ * en escritorio y la superficie de mirada en movil).
+ */
+#ui-layer .hud-hurt,
+#ui-layer .hud-hurt-msg,
+#ui-layer .hud-warning,
+#ui-layer .hud-zona,
+#ui-layer .hud-crosshair,
+#ui-layer .hud-stats,
+#ui-layer .hud-prompt,
+#ui-layer .hud-lamp,
+#ui-layer .hud-mission {
+  pointer-events: none;
+}
+
+.hud-hurt {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0;
+  box-shadow: inset 0 0 100px 30px rgba(200, 0, 0, 0.75);
+  transition: opacity 0.05s ease;
+}
+.hud-hurt.visible {
+  animation: hurtflash 0.75s ease-out forwards;
+}
+@keyframes hurtflash {
+  0%   { opacity: 1; }
+  15%  { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+.hud-hurt-msg {
+  position: fixed;
+  left: 50%;
+  bottom: 32%;
+  transform: translateX(-50%);
+  padding: 10px 22px;
+  background: rgba(160, 0, 0, 0.88);
+  border: 2px solid #ff4040;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  max-width: 80vw;
+  z-index: 61;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.hud-hurt-msg.visible { opacity: 1; }
+
+/* ─────────────── Indicador de LINTERNA ──────────────────────────── */
+.hud-lamp {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  padding: 5px 11px;
+  background: rgba(0, 0, 0, 0.60);
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-family: 'Consolas', monospace;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  z-index: 12;
+  color: #aab0c8;
+  pointer-events: none;
+}
+.hud-lamp.lamp-off { color: #4a4e60; border-color: #2a2e3a; }
+.hud-lamp.lamp-l1  { color: #8894cc; border-color: #445080; }
+.hud-lamp.lamp-l2  { color: #b8c8f0; border-color: #6678b8; }
+.hud-lamp.lamp-l3  {
+  color: #dce8ff; border-color: #88a0e8;
+  box-shadow: 0 0 8px rgba(160, 190, 255, 0.4);
+}
+.hud-lamp.lamp-l4  {
+  color: #ffffff; border-color: #c8d8ff;
+  box-shadow: 0 0 16px rgba(200, 220, 255, 0.75);
+}
+
+/* ─────────────── Luminosidad de la mina ────────────────────── */
+.hud-brightness {
+  position: fixed;
+  right: 14px;
+  bottom: 52px;           /* encima del indicador de linterna */
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.70);
+  border: 1px solid rgba(255, 204, 0, 0.28);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-family: 'Consolas', monospace;
+  color: #ffcc00;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
+  z-index: 12;
+}
+.hud-brightness.visible { opacity: 1; }
+.brightness-label {
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.07em;
+  color: #c8a840;
+  white-space: nowrap;
+}
+.brightness-bar {
+  display: flex;
+  gap: 2px;
+}
+.brightness-bar span {
+  display: inline-block;
+  width: 9px;
+  height: 7px;
+  border-radius: 1px;
+  border: 1px solid rgba(255, 204, 0, 0.22);
+  background: rgba(255, 204, 0, 0.07);
+}
+.brightness-bar span.bar-on {
+  background: #ffcc00;
+  border-color: #ffcc00;
+  box-shadow: 0 0 3px rgba(255, 204, 0, 0.7);
+}
+.brightness-bar span.bar-default {
+  background: #ffe566;
+  border-color: #ffe566;
+  box-shadow: 0 0 5px rgba(255, 230, 80, 0.9);
+}
+.brightness-pct {
+  min-width: 36px;
+  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.brightness-hint {
+  font-size: 0.60rem;
+  color: #806830;
+  letter-spacing: 0.05em;
+}
+
+/* Tambien excluir de pointer-events en la capa UI */
+#ui-layer .hud-brightness { pointer-events: none; }
+
+/* ─────────────── Mision activa (objetivos) ──────────────────── */
+.hud-mission {
+  position: fixed;
+  right: 14px;
+  top: env(safe-area-inset-top, 8px);
+  max-width: 260px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid #2a3040;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-family: 'Consolas', monospace;
+  color: #9ab0cc;
+  z-index: 12;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.hud-mission.visible { opacity: 1; }
+.hud-mission .mission-title {
+  color: var(--amarillo-aviso);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+.hud-mission .mission-obj {
+  display: flex; align-items: flex-start; gap: 5px;
+  margin: 2px 0; color: #8898aa; font-size: 0.69rem; line-height: 1.35;
+}
+.hud-mission .mission-obj.done { color: #4a9a4a; text-decoration: line-through; }
+.hud-mission .mission-obj::before { content: '\25CB'; flex-shrink: 0; }
+.hud-mission .mission-obj.done::before { content: '\25CF'; color: #39ff14; }
+
+/* Aviso de rotacion: pide modo horizontal en celular en vertical. */
+.orientation-hint {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  text-align: center;
+  background: #000;
+  color: var(--amarillo-aviso);
+  z-index: 200;
+  padding: 30px;
+  font-size: 1.1rem;
+}
+@media (max-width: 920px) and (orientation: portrait) {
+  .orientation-hint.enabled { display: grid; }
+}
+
+/* ─────────────── Minimap GTA V (radar circular) ──────────────── */
+.hud-minimap {
+  position: fixed;
+  right: 14px;
+  bottom: 80px;          /* justo encima del indicador de linterna */
+  width:  180px;
+  height: 180px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 3px #1a3d1a,
+    0 0 0 5px #0a140a,
+    0 0 12px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  z-index: 11;
+}
+.hud-minimap.visible { opacity: 1; }
+
+/* En movil: mas pequeno para no tapar la pantalla */
+@media (max-width: 640px) {
+  .hud-minimap {
+    width:  120px;
+    height: 120px;
+    bottom: 70px;
+    right: 8px;
+  }
+}

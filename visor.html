@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport-fit=cover + user-scalable=no: esencial para touch en celular -->
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+             user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#15181d" />
+  <title>Visualizador de Elementos — Mina Cerro Lindo</title>
+  <style>
+    /* ── Reset y base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #15181d; color: #e8f0ff;
+      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+      overflow: hidden;
+      /* Bloquea scroll/zoom de browser durante interaccion con el canvas */
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       DESKTOP: panel fijo izquierda + canvas derecha
+    ══════════════════════════════════════════════════════ */
+    #layout { display: flex; height: 100dvh; }
+
+    /* ── Panel lateral ── */
+    #panel {
+      width: 290px; flex-shrink: 0;
+      background: #1c2127;
+      border-right: 1px solid #2c333c;
+      display: flex; flex-direction: column;
+      z-index: 10;
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #2c333c;
+    }
+    #panel-header h1 {
+      font-size: 0.88rem; letter-spacing: 0.06em; color: #39ff14;
+    }
+    #btn-close-panel {
+      display: none;
+      background: none; border: none; color: #7a8694; font-size: 1.3rem;
+      cursor: pointer; padding: 2px 6px; border-radius: 4px;
+      line-height: 1;
+    }
+    #btn-close-panel:hover { color: #e8f0ff; }
+
+    #search {
+      margin: 10px; padding: 9px 12px;
+      background: #11151a; border: 1px solid #2c333c;
+      color: #e8f0ff; border-radius: 6px; font-size: 0.9rem; width: calc(100% - 20px);
+    }
+    #search:focus { outline: none; border-color: rgba(57,255,20,0.5); }
+
+    #lista { overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+    .item {
+      padding: 10px 16px; cursor: pointer;
+      border-left: 3px solid transparent;
+      font-size: 0.86rem;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.1s;
+    }
+    .item:hover  { background: #232a32; }
+    .item.activo { background: #232a32; border-left-color: #39ff14; color: #39ff14; }
+
+    #panel-footer {
+      padding: 10px 16px; border-top: 1px solid #2c333c; font-size: 0.8rem;
+    }
+    a.volver { color: #39ff14; text-decoration: none; }
+    a.volver:hover { text-decoration: underline; }
+
+    /* ── Canvas 3D ── */
+    #escena { position: relative; flex: 1; overflow: hidden; }
+    #canvas-holder { position: absolute; inset: 0; }
+    /* touch-action: none es CRITICO para que OrbitControls reciba los eventos táctiles */
+    #canvas-holder canvas { display: block; touch-action: none; }
+
+    /* ── Info del elemento (inferior) ── */
+    #info {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 12px 18px 16px;
+      background: linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0));
+      pointer-events: none;
+    }
+    #info h2  { font-size: 1.05rem; color: #ffcc00; margin-bottom: 3px; }
+    #info p   { font-size: 0.82rem; color: #c8d2dc; margin: 2px 0; }
+    #dims     { font-family: Consolas, monospace; color: #7fd87f; font-size: 0.78rem; }
+
+    /* ── Hint de controles (arriba izquierda del canvas) ── */
+    .hint {
+      position: absolute; top: 12px; left: 12px;
+      font-size: 0.74rem; color: #7a8694;
+      background: rgba(0,0,0,0.52); padding: 5px 10px; border-radius: 6px;
+      pointer-events: none; backdrop-filter: blur(4px);
+    }
+    .hint-touch { display: none; }
+
+    /* ── Checkboxes de opciones (arriba derecha del canvas) ── */
+    #controles {
+      position: absolute; top: 12px; right: 12px;
+      display: flex; gap: 8px;
+      background: rgba(0,0,0,0.52); padding: 7px 12px; border-radius: 8px;
+      backdrop-filter: blur(4px);
+    }
+    #controles label {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.8rem; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #controles input[type="checkbox"] {
+      accent-color: #39ff14; cursor: pointer;
+      width: 15px; height: 15px;
+    }
+
+    /* ── Boton flotante MENU (solo mobile) ── */
+    #btn-panel {
+      display: none;
+      position: fixed; top: 12px; left: 12px; z-index: 20;
+      background: rgba(28,33,39,0.92); border: 1px solid #2c333c;
+      color: #39ff14; font-size: 0.82rem; letter-spacing: 0.05em;
+      padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      backdrop-filter: blur(6px);
+      -webkit-tap-highlight-color: transparent;
+      align-items: center; gap: 6px;
+    }
+
+    /* ── Overlay oscuro (mobile con panel abierto) ── */
+    #overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.58); z-index: 9;
+      touch-action: none;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       TABLET: panel mas estrecho
+    ══════════════════════════════════════════════════════ */
+    @media (max-width: 960px) and (min-width: 641px) {
+      #panel { width: 230px; }
+      .item { font-size: 0.82rem; padding: 9px 14px; }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       MOBILE: canvas full-screen + panel drawer
+    ══════════════════════════════════════════════════════ */
+    @media (max-width: 640px) {
+      /* Layout: bloque simple, canvas ocupa todo */
+      #layout { display: block; height: 100dvh; }
+
+      /* Escena: posicion fija, cubre toda la pantalla */
+      #escena {
+        position: fixed; inset: 0;
+        width: 100vw; height: 100dvh;
+      }
+
+      /* Panel: drawer lateral que entra desde la izquierda */
+      #panel {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        width: min(82vw, 300px);
+        transform: translateX(-100%);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.6);
+      }
+      #panel.abierto { transform: translateX(0); }
+
+      /* Overlay visible cuando panel esta abierto */
+      #panel.abierto ~ #overlay { display: block; }
+
+      /* Mostrar boton menu y boton cerrar panel */
+      #btn-panel      { display: flex; }
+      #btn-close-panel { display: block; }
+
+      /* Hint de teclado/raton oculto; mostrar el de touch */
+      .hint-mouse { display: none; }
+      .hint-touch { display: block; }
+
+      /* Search y lista mas grandes (touch targets) */
+      #search { font-size: 1rem; padding: 11px 12px; }
+      .item   { font-size: 0.94rem; padding: 13px 16px; }
+
+      /* Info: mas compacta, respeta notch inferior */
+      #info {
+        padding: 8px 14px calc(env(safe-area-inset-bottom, 0px) + 70px);
+      }
+      #info h2  { font-size: 0.92rem; }
+      #info p   { font-size: 0.76rem; }
+
+      /* Controles: columna vertical en la esquina inferior derecha */
+      #controles {
+        top: auto; right: 10px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+        flex-direction: column;
+        padding: 10px 14px; gap: 12px;
+      }
+      #controles label        { font-size: 0.9rem; gap: 10px; }
+      #controles input[type="checkbox"] { width: 20px; height: 20px; }
+
+      /* Boton panel: alejado del notch superior */
+      #btn-panel { top: calc(env(safe-area-inset-top, 0px) + 12px); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Boton flotante: abre el panel de elementos en mobile -->
+  <button id="btn-panel">☰ ELEMENTOS</button>
+
+  <!-- Overlay: cierra el panel al tocar fuera (mobile) -->
+  <div id="overlay"></div>
+
+  <div id="layout">
+
+    <!-- ── Panel de elementos ── -->
+    <aside id="panel">
+      <div id="panel-header">
+        <h1>ELEMENTOS DE LA MINA</h1>
+        <button id="btn-close-panel" title="Cerrar">✕</button>
+      </div>
+      <input id="search" type="text" placeholder="Buscar elemento…" autocomplete="off" />
+      <div id="lista"></div>
+      <div id="panel-footer">
+        <a class="volver" href="/">← Volver al simulador</a>
+      </div>
+    </aside>
+
+    <!-- ── Escena 3D ── -->
+    <section id="escena">
+      <div id="canvas-holder"></div>
+
+      <!-- Hint desktop -->
+      <div class="hint hint-mouse">
+        Arrastra para rotar &nbsp;·&nbsp; Rueda para zoom &nbsp;·&nbsp; Clic derecho para desplazar
+      </div>
+      <!-- Hint mobile -->
+      <div class="hint hint-touch">
+        1 dedo: rotar &nbsp;·&nbsp; 2 dedos: zoom y pan
+      </div>
+
+      <!-- Opciones -->
+      <div id="controles">
+        <label><input id="autorot" type="checkbox" checked /> Girar</label>
+        <label><input id="grid"    type="checkbox" checked /> Grilla</label>
+        <label><input id="wire"    type="checkbox"          /> Wireframe</label>
+      </div>
+
+      <!-- Info del elemento seleccionado -->
+      <div id="info">
+        <h2 id="nombre">—</h2>
+        <p  id="desc"></p>
+        <p  id="dims"></p>
+      </div>
+    </section>
+
+  </div><!-- #layout -->
+
+  <!-- ── Logica del panel mobile (puro DOM, sin Three.js) ── -->
+  <script>
+    const panel      = document.getElementById('panel');
+    const overlay    = document.getElementById('overlay');
+    const btnPanel   = document.getElementById('btn-panel');
+    const btnClose   = document.getElementById('btn-close-panel');
+    const listaEl    = document.getElementById('lista');
+
+    function abrirPanel()  { panel.classList.add('abierto');    overlay.style.display = 'block'; }
+    function cerrarPanel() { panel.classList.remove('abierto'); overlay.style.display = ''; }
+
+    btnPanel.addEventListener('click',   abrirPanel);
+    btnClose.addEventListener('click',   cerrarPanel);
+    overlay.addEventListener('click',    cerrarPanel);
+    // Cerrar al seleccionar un elemento en mobile
+    listaEl.addEventListener('click', () => { if (window.innerWidth <= 640) cerrarPanel(); });
+  </script>
+
+  <!-- ── Motor Three.js ── -->
+  <script type="module" src="/src/visor/visor.js"></script>
+</body>
+</html>
