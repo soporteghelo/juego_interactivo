@@ -19,6 +19,8 @@ export const meta = {
 };
 
 let _texCache = null;
+let _matNormal = null;
+let _matSobre  = null;
 
 function texturaCuadricula() {
   if (_texCache) return _texCache;
@@ -57,6 +59,34 @@ function texturaCuadricula() {
   return _texCache;
 }
 
+function _getMat(sobresalida) {
+  if (sobresalida) {
+    if (!_matSobre) _matSobre = new THREE.MeshStandardMaterial({
+      map: texturaCuadricula(),
+      transparent: true, alphaTest: 0.3,
+      roughness: 0.92, metalness: 0.55,
+      color: 0x6a2a0a, side: THREE.DoubleSide
+    });
+    return _matSobre;
+  }
+  if (!_matNormal) _matNormal = new THREE.MeshStandardMaterial({
+    map: texturaCuadricula(),
+    transparent: true, alphaTest: 0.3,
+    roughness: 0.92, metalness: 0.55,
+    color: 0x7a3a18, side: THREE.DoubleSide
+  });
+  return _matNormal;
+}
+
+// Escala los UVs de la geometría en lugar de clonar la textura con repeat distinto.
+function _scaleUVs(geo, repeatX, repeatY) {
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, uv.getX(i) * repeatX, uv.getY(i) * repeatY);
+  }
+  uv.needsUpdate = true;
+}
+
 function seudoRng(seed) {
   let s = seed & 0xffffffff;
   return () => {
@@ -70,23 +100,14 @@ function seudoRng(seed) {
  * @returns {THREE.Mesh|THREE.Group}
  */
 export function crear({ width = 3, height = 2.2, sobresalida = false, seed = 42 } = {}) {
-  const tex = texturaCuadricula().clone();
-  tex.needsUpdate = true;
-  tex.repeat.set(width * 2.8, height * 2.8);
-
-  const mat = new THREE.MeshStandardMaterial({
-    map: tex,
-    transparent: true,
-    alphaTest: 0.3,
-    roughness: 0.92,
-    metalness: 0.55,
-    color: sobresalida ? 0x6a2a0a : 0x7a3a18,
-    side: THREE.DoubleSide
-  });
+  const mat = _getMat(sobresalida);
+  const repeatX = width * 2.8;
+  const repeatY = height * 2.8;
 
   if (!sobresalida) {
     // Malla plana simple con leve irregularidad
     const geo = new THREE.PlaneGeometry(width, height, 6, 5);
+    _scaleUVs(geo, repeatX, repeatY);
     const pos = geo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       pos.setZ(i, (Math.random() - 0.5) * 0.025);
@@ -121,6 +142,7 @@ export function crear({ width = 3, height = 2.2, sobresalida = false, seed = 42 
   // Panel principal con deformacion (alta subdivision para mejor forma)
   const segsX = 18, segsY = 12;
   const geo = new THREE.PlaneGeometry(width, height, segsX, segsY);
+  _scaleUVs(geo, repeatX, repeatY);
   const pos = geo.attributes.position;
 
   for (let i = 0; i < pos.count; i++) {
@@ -145,11 +167,7 @@ export function crear({ width = 3, height = 2.2, sobresalida = false, seed = 42 
 
   // ── EXTREMOS DE VARILLA / ALAMBRE SUELTO ─────────────────────────
   // Simulan los extremos cortados de la malla que sobresalen peligrosamente.
-  const matVar = new THREE.MeshStandardMaterial({
-    color: 0x4a1a06,
-    roughness: 0.92,
-    metalness: 0.75
-  });
+  const matVar = MineMaterials.plano(0x4a1a06, { rough: 0.92, metal: 0.75 });
 
   const nVarillas = 9 + Math.floor(rng() * 8); // 9-16 extremos sueltos
   for (let i = 0; i < nVarillas; i++) {
@@ -201,7 +219,7 @@ export function crear({ width = 3, height = 2.2, sobresalida = false, seed = 42 
 
   // ── FRAGMENTOS DE SHOTCRETE pegados a la malla ─────────────────
   // Trozos de concreto colgando donde la roca empezo a ceder.
-  const matCem = new THREE.MeshStandardMaterial({ color: 0x8a8880, roughness: 0.98 });
+  const matCem = MineMaterials.plano(0x8a8880, { rough: 0.98, metal: 0 });
   const nFrags = 2 + Math.floor(rng() * 3);
   for (let i = 0; i < nFrags; i++) {
     const fw = 0.15 + rng() * 0.30;

@@ -35,7 +35,7 @@ export class SegmentAssembler {
     this.scatter = new PropScatter(rng);
   }
 
-  assemble(layout) {
+  async assemble(layout, onProgress = () => {}) {
     const segments = [];
     const interactables = [];
     const hazards = [];
@@ -43,6 +43,7 @@ export class SegmentAssembler {
 
     const cursor = new THREE.Vector3(0, 0, 0); // posicion de la entrada del proximo tramo
     let segIndex = 0;
+    const total = layout.length;
 
     for (const node of layout) {
       const Cls = SEGMENT_CLASSES[node.type];
@@ -88,10 +89,14 @@ export class SegmentAssembler {
 
       segments.push(seg);
       this.bus.emit('world:segmentLoaded', { type: seg.type, position: cursor.clone() });
+      onProgress(segIndex, total);
 
       // Avanza el cursor a la salida del tramo (rampa puede cambiar la cota Y).
       cursor.z += seg.connectors.exit.position.z;     // exit.z es negativo
       cursor.y += seg.connectors.exit.position.y;     // distinto de 0 solo en rampas
+
+      // Cede el hilo al navegador cada 3 tramos para evitar el freeze de la UI.
+      if (segIndex % 3 === 0) await new Promise(r => setTimeout(r, 0));
     }
 
     return { segments, interactables, hazards, spawnPoint };

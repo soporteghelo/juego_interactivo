@@ -248,15 +248,16 @@ class MaterialLibrary {
     );
   }
 
-  /** Material de color plano parametrizable (EPP, cascos, equipos). No cacheado por color. */
+  /** Material de color plano parametrizable (EPP, cascos, equipos). Cacheado por parametros. */
   plano(color, { rough = 0.8, metal = 0.1, emissive = 0, emissiveIntensity = 0 } = {}) {
-    return new THREE.MeshStandardMaterial({
+    const key = `plano:${color}:${rough}:${metal}:${emissive}:${emissiveIntensity}`;
+    return this._get(key, () => new THREE.MeshStandardMaterial({
       color,
       roughness: rough,
       metalness: metal,
       emissive,
       emissiveIntensity
-    });
+    }));
   }
 }
 

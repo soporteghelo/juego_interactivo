@@ -92,7 +92,9 @@ export class Engine {
       lighting: this.lighting,
       seed: Settings.worldSeed
     });
-    this.world.build();
+    await this.world.build((i, total) => {
+      onStatus(`Construyendo galeria ${i} / ${total}…`);
+    });
 
     await tick();
     // Vehiculos: recorren el mapa completo en via de un solo sentido (loop continuo).

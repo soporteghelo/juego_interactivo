@@ -29,7 +29,7 @@ export class World {
     this.bus.on('player:moved', ({ position }) => this._playerPos.copy(position));
   }
 
-  build() {
+  async build(onProgress = () => {}) {
     const rng = new Rng(this.seed);
     const layout = new LayoutGenerator(rng).generate();
 
@@ -41,7 +41,7 @@ export class World {
       bus: this.bus
     });
 
-    const result = assembler.assemble(layout);
+    const result = await assembler.assemble(layout, onProgress);
     this.segments = result.segments;
     this.interactables = result.interactables;
     this.hazards = result.hazards;

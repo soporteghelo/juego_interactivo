@@ -15,6 +15,7 @@ export const meta = {
 };
 
 const _texCache = new Map();
+const _matCache = new Map();
 
 function lienzo(w = 512, h = 340) {
   const canvas = document.createElement('canvas');
@@ -157,14 +158,18 @@ export function crearSenal(tipo) {
     _texCache.set(tipo, entry);
   }
 
-  const mat = new THREE.MeshStandardMaterial({
-    map: entry.texture,
-    roughness: 0.7,
-    metalness: 0,
-    emissive: 0x111111,
-    emissiveIntensity: 0.15,
-    side: THREE.DoubleSide
-  });
+  let mat = _matCache.get(tipo);
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({
+      map: entry.texture,
+      roughness: 0.7,
+      metalness: 0,
+      emissive: 0x111111,
+      emissiveIntensity: 0.15,
+      side: THREE.DoubleSide
+    });
+    _matCache.set(tipo, mat);
+  }
 
   const h = 0.6;
   const w = h * entry.aspect;

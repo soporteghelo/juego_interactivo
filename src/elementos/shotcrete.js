@@ -60,6 +60,20 @@ function texturaCraquelada(craquelado = true) {
   return tex;
 }
 
+// Pool de 4 patrones de fisura pre-generados + 1 sin fisuras.
+// Se inicializa al primer uso para no bloquear la carga del módulo.
+const POOL_SIZE = 4;
+const _matPool = { craq: null, liso: null };
+
+function _ensurePool() {
+  if (_matPool.craq) return;
+  const opts = { roughness: 0.97, metalness: 0, side: THREE.DoubleSide };
+  _matPool.craq = Array.from({ length: POOL_SIZE }, () =>
+    new THREE.MeshStandardMaterial({ ...opts, map: texturaCraquelada(true) })
+  );
+  _matPool.liso = new THREE.MeshStandardMaterial({ ...opts, map: texturaCraquelada(false) });
+}
+
 /** Material de shotcrete liso (para la carcasa del tramo). */
 export function materialShotcrete({ envejecido = false } = {}) {
   return MineMaterials.shotcrete(!envejecido);
@@ -71,12 +85,10 @@ export function materialShotcrete({ envejecido = false } = {}) {
  * @returns {THREE.Mesh}
  */
 export function crear({ width = 3, height = 2.4, craquelado = true } = {}) {
-  const mat = new THREE.MeshStandardMaterial({
-    map: texturaCraquelada(craquelado),
-    roughness: 0.97,
-    metalness: 0,
-    side: THREE.DoubleSide
-  });
+  _ensurePool();
+  const mat = craquelado
+    ? _matPool.craq[Math.floor(Math.random() * POOL_SIZE)]
+    : _matPool.liso;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
   mesh.name = 'shotcrete_craquelado';
   return mesh;
