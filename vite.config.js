@@ -20,10 +20,17 @@ export default defineConfig({
     target: 'es2020',
     outDir: 'dist',
     sourcemap: false,
+    chunkSizeWarningLimit: 2200,
     rollupOptions: {
       input: {
         main:  resolve(__dirname, 'index.html'),
         visor: resolve(__dirname, 'visor.html')
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/three')) return 'three';
+          if (id.includes('@dimforge/rapier3d-compat')) return 'rapier';
+        }
       }
     }
   },
