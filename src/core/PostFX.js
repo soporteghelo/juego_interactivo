@@ -60,7 +60,11 @@ export class PostFX {
 
   setSize(w, h) {
     this.composer.setSize(w, h);
-    this.bloom.setSize(w, h);
+    // Bloom a media resolucion: los pases de blur (los mas caros, cada frame) trabajan
+    // con 1/4 de los pixeles. El resplandor es difuso, asi que la perdida es imperceptible
+    // y el ahorro en GPU integrada / celular es grande.
+    const factor = Settings.current.bloomHalfRes === false ? 1 : 0.5;
+    this.bloom.setSize(Math.max(1, Math.round(w * factor)), Math.max(1, Math.round(h * factor)));
   }
 
   render(dt) {

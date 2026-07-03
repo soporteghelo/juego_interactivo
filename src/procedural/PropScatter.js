@@ -6,8 +6,8 @@ import { geometriaPerno, materialPerno } from '../elementos/perno.js';
 import { geometriaRoca, materialRoca } from '../elementos/roca_suelta.js';
 import { crear as crearMalla } from '../elementos/malla.js';
 import { crear as crearShotcrete } from '../elementos/shotcrete.js';
-import { crear as crearCharco } from '../elementos/charco.js';
-import { crear as crearBaliza } from '../elementos/baliza.js';
+import { geometriaCharco, materialCharco } from '../elementos/charco.js';
+import { geometriaBaliza, materialBaliza } from '../elementos/baliza.js';
 import { crear as crearVent } from '../elementos/ventilacion.js';
 import { crear as crearBandeja } from '../elementos/bandeja_cables.js';
 import { crear as crearManguera } from '../elementos/manguera.js';
@@ -208,15 +208,30 @@ export class PropScatter {
     seg.group.add(inst);
   }
 
-  // --- Charcos de agua reflectivos ---
+  // --- Charcos de agua reflectivos (instanciados: 1 draw call por tramo) ---
   _puddles(seg) {
     const count = Math.round(this.rng.range(5, 9) * Settings.current.particleDensity) + 4;
+    if (count <= 0) return;
+    const inst = new THREE.InstancedMesh(geometriaCharco(), materialCharco(), count);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion(); // sin rotacion (ya horneada en la geometria)
+    const p = new THREE.Vector3();
+    const s = new THREE.Vector3();
     for (let i = 0; i < count; i++) {
-      const p = crearCharco({ radio: this.rng.range(0.5, 1.6) });
-      p.position.x = this.rng.range(-seg.width / 2 + 0.6, seg.width / 2 - 0.6);
-      p.position.z = -this.rng.range(0.4, seg.length - 0.4);
-      seg.group.add(p);
+      const radio = this.rng.range(0.5, 1.6);
+      p.set(
+        this.rng.range(-seg.width / 2 + 0.6, seg.width / 2 - 0.6),
+        0.015,
+        -this.rng.range(0.4, seg.length - 0.4)
+      );
+      // Elipse irregular: escala en Z distinta (como el scale.y original tras rotar).
+      s.set(radio, 1, radio * (0.6 + this.rng.next() * 0.8));
+      m.compose(p, q, s);
+      inst.setMatrixAt(i, m);
     }
+    inst.instanceMatrix.needsUpdate = true;
+    inst.name = 'charcos';
+    seg.group.add(inst);
   }
 
   // --- Manga de ventilacion + ventilador secundario ocasional ---
@@ -252,13 +267,25 @@ export class PropScatter {
     }
   }
 
+  // --- Balizas / delineadores (geometria fusionada + instanciado: 1 draw call) ---
   _delineators(seg) {
     const side = this.rng.chance(0.5) ? 1 : -1;
-    for (let z = -2; z > -seg.length; z -= this.rng.range(3, 5)) {
-      const d = crearBaliza();
-      d.position.set(side * (seg.width / 2 - 0.7), 0, z);
-      seg.group.add(d);
-    }
+    const zs = [];
+    for (let z = -2; z > -seg.length; z -= this.rng.range(3, 5)) zs.push(z);
+    if (zs.length === 0) return;
+    const inst = new THREE.InstancedMesh(geometriaBaliza(), materialBaliza(), zs.length);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3(1, 1, 1);
+    const p = new THREE.Vector3();
+    zs.forEach((z, i) => {
+      p.set(side * (seg.width / 2 - 0.7), 0, z);
+      m.compose(p, q, s);
+      inst.setMatrixAt(i, m);
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    inst.name = 'balizas';
+    seg.group.add(inst);
   }
 
   // --- Nichos electricos empotrados en el hastial (tablero a 1m del suelo) ---

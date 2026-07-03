@@ -25,3 +25,22 @@ export function crear({ radio = 1.1 } = {}) {
   mesh.name = 'charco';
   return mesh;
 }
+
+// ── Instanciado: geometria unitaria plana (radio 1) compartida ──────────────
+// Un solo CircleGeometry apoyado en el piso (rotacion ya horneada) para que las
+// instancias solo necesiten trasladar + escalar. Elimina ~11 draw calls por tramo.
+let _geoCache = null;
+
+/** Geometria base del charco (radio 1, horizontal). Se comparte entre instancias. */
+export function geometriaCharco() {
+  if (_geoCache) return _geoCache;
+  const geo = new THREE.CircleGeometry(1, 18);
+  geo.rotateX(-Math.PI / 2);   // horneada: queda plana sobre el suelo
+  _geoCache = geo;
+  return _geoCache;
+}
+
+/** Material reflectivo compartido (mismo que crear()). */
+export function materialCharco() {
+  return MineMaterials.charco();
+}
