@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MineMaterials } from '../world/materials/MineMaterials.js';
 import { crear as crearRefugio } from './refugio_draeger.js';
 import { crearSenal } from './senal.js';
+import { sub } from './subelemento.js';
 
 /**
  * NICHO DEL REFUGIO MINERO — excavación en el hastial que aloja al refugio Dräger.
@@ -225,9 +226,11 @@ export function crear({ seed = 3, numero = 2 } = {}) {
   const mSuelo = MineMaterials.plano(0x2b2924, { rough: 1.0 });
 
   // ── PARED DEL FONDO ──────────────────────────────────────────────
+  // `S` = grupo del SUBELEMENTO activo (discretización para el visor).
+  let S = sub(g, 'excavacion', 'Excavación (shotcrete + malla)', 'Fondo, paredes laterales y bóveda de roca fBm con shotcrete blanco y malla.');
   const fondo = new THREE.Mesh(_planoRoca(NW, NH, 32, 26, 0.5, 2.6, ox, oy, 0.3), _matRocaMalla(NW, NH));
   fondo.position.set(0, NH / 2, -ND);
-  g.add(fondo);
+  S.add(fondo);
 
   // ── PAREDES LATERALES ────────────────────────────────────────────
   for (const sign of [-1, 1]) {
@@ -237,7 +240,7 @@ export function crear({ seed = 3, numero = 2 } = {}) {
     );
     lat.rotation.y = -sign * Math.PI / 2;
     lat.position.set(sign * NW / 2, NH / 2, -ND / 2);
-    g.add(lat);
+    S.add(lat);
   }
 
   // ── TECHO (bóveda irregular) ─────────────────────────────────────
@@ -247,25 +250,27 @@ export function crear({ seed = 3, numero = 2 } = {}) {
   );
   techo.rotation.x = Math.PI / 2;
   techo.position.set(0, NH, -ND / 2);
-  g.add(techo);
+  S.add(techo);
 
   // ── SUELO interior + delantal exterior (barro compacto) ──────────
+  S = sub(g, 'suelo', 'Suelo y charco', 'Piso de barro compacto, delantal exterior y charco de la entrada.');
   const suelo = new THREE.Mesh(new THREE.PlaneGeometry(NW, ND, 4, 8), mSuelo);
   suelo.rotation.x = -Math.PI / 2;
   suelo.position.set(0, 0.01, -ND / 2);
-  g.add(suelo);
+  S.add(suelo);
   const delantal = new THREE.Mesh(new THREE.PlaneGeometry(NW + 5, 3.2, 4, 3), mSuelo);
   delantal.rotation.x = -Math.PI / 2;
   delantal.position.set(0, 0.005, 1.6);
-  g.add(delantal);
+  S.add(delantal);
   // charco frente a la entrada (foto: piso húmedo con escorrentía)
   const charco = new THREE.Mesh(new THREE.CircleGeometry(0.9, 18), MineMaterials.charco());
   charco.rotation.x = -Math.PI / 2;
   charco.position.set(-1.1, 0.015, 0.9);
   charco.scale.set(1, 0.45, 1);
-  g.add(charco);
+  S.add(charco);
 
   // ── MARCO DE APERTURA IRREGULAR + ALAS LATERALES ─────────────────
+  S = sub(g, 'marco_apertura', 'Marco de apertura y alas', 'Rock collar irregular de la apertura + alas de hastial laterales.');
   const esp = 0.6, mAmp = 0.32, mEdge = 0.36, mScl = 3.0;
   const marcoW = NW + 0.5, marcoH = NH + 0.4;
   const marcos = [
@@ -276,7 +281,7 @@ export function crear({ seed = 3, numero = 2 } = {}) {
   for (const { geo, pos: p, dims } of marcos) {
     const m = new THREE.Mesh(geo, _matRocaMalla(dims[0], dims[1]));
     m.position.set(...p);
-    g.add(m);
+    S.add(m);
   }
   // alas de hastial a ambos lados (donde cuelga la señalética de la foto)
   const alaW = 2.4;
@@ -286,42 +291,45 @@ export function crear({ seed = 3, numero = 2 } = {}) {
       _matRocaMalla(alaW, marcoH)
     );
     ala.position.set(sign * (NW / 2 + esp + alaW / 2 - 0.05), marcoH / 2 - 0.2, 0);
-    g.add(ala);
+    S.add(ala);
   }
 
   // ════════════════════════════════════════════════════════════════
   //  REFUGIO DRÄGER (frente hacia la apertura)
   // ════════════════════════════════════════════════════════════════
+  S = sub(g, 'refugio_draeger', 'Refugio Dräger (anidado)', 'Cámara de rescate Dräger completa colocada al fondo del nicho.');
   const refugio = crearRefugio({ numero });
   refugio.rotation.y = -Math.PI / 2;      // frente local +X → +Z (hacia la salida)
   refugio.position.set(-0.25, 0, -4.2);   // frente a z ≈ -1.2; recámara trasera a -7.8
-  g.add(refugio);
+  S.add(refugio);
   // reexpone la interacción del refugio en el nicho
   g.userData.interactable = refugio.userData.interactable;
 
   // ════════════════════════════════════════════════════════════════
   //  CORDEL CON LETREROS AMARILLOS "REFUGIO MINERO N°2"
   // ════════════════════════════════════════════════════════════════
+  S = sub(g, 'cordel_letreros', 'Cordel con letreros', 'Cordel cruzando el acceso con 3 letreros amarillos "REFUGIO MINERO N°2".');
   const cordel = new THREE.Mesh(
     new THREE.CylinderGeometry(0.008, 0.008, NW + 3.6, 5),
     MineMaterials.plano(0x8a8578, { rough: 0.9 })
   );
   cordel.rotation.z = Math.PI / 2;
   cordel.position.set(0, 1.02, 0.55);
-  g.add(cordel);
+  S.add(cordel);
   for (let i = 0; i < 3; i++) {
     const banner = crearSenal('refugio_banner');
     banner.scale.set(1.05, 0.5, 1);
     banner.position.set(-2.6 + i * 2.6, 0.72, 0.56);
     banner.rotation.y = (i - 1) * 0.06;         // leve desalineación natural
     banner.rotation.x = -0.05 + (i % 2) * 0.08; // colgados, no perfectos
-    g.add(banner);
+    S.add(banner);
   }
 
   // ════════════════════════════════════════════════════════════════
   //  SEÑALÉTICA DE LAS PAREDES (como la foto)
   // ════════════════════════════════════════════════════════════════
   // Izquierda: PROHIBIDO BOTAR BASURA + punto de reunión (verde)
+  S = sub(g, 'senaletica', 'Señalética de paredes', '"Prohibido botar basura", punto de reunión y placas doradas de emergencia.');
   const xIzq = -(NW / 2 + esp + alaW / 2 - 0.05);
   const basura = new THREE.Mesh(
     new THREE.PlaneGeometry(0.55, 0.77),
@@ -329,12 +337,12 @@ export function crear({ seed = 3, numero = 2 } = {}) {
   );
   basura.position.set(xIzq - 0.35, 3.15, 0.45);
   basura.rotation.y = 0.12;
-  g.add(basura);
+  S.add(basura);
   const reunion = crearSenal('via_escape');
   reunion.scale.set(0.6, 0.6, 1);
   reunion.position.set(xIzq + 0.75, 2.95, 0.48);
   reunion.rotation.y = 0.08;
-  g.add(reunion);
+  S.add(reunion);
 
   // Derecha: fila de 4 placas doradas de estación de emergencia
   const iconos = ['⛑', '🕯', '🚿', '✚'];
@@ -346,10 +354,11 @@ export function crear({ seed = 3, numero = 2 } = {}) {
     );
     pd.position.set(xDer + 0.28 + i * 0.55, 3.3 - i * 0.06, 0.46);
     pd.rotation.y = -0.1 - i * 0.02;
-    g.add(pd);
+    S.add(pd);
   }
 
   // ── Cables por la pared derecha (catenaria simple, foto real) ────
+  S = sub(g, 'cables', 'Cables de pared', 'Cables en catenaria sobre la pared derecha.');
   const mCable = MineMaterials.cable();
   for (let i = 0; i < 2; i++) {
     const cable = new THREE.Mesh(
@@ -358,22 +367,23 @@ export function crear({ seed = 3, numero = 2 } = {}) {
     );
     cable.rotation.z = Math.PI / 2 + 0.06 + i * 0.05;
     cable.position.set(xDer + 1.0, 2.2 - i * 0.35, 0.42);
-    g.add(cable);
+    S.add(cable);
   }
 
   // ════════════════════════════════════════════════════════════════
   //  ILUMINACIÓN — luz cálida de mina + LED verde de acceso
   // ════════════════════════════════════════════════════════════════
+  S = sub(g, 'iluminacion', 'Iluminación', 'Luces cálidas de mina + LED verde de zona de refugio.');
   for (const [zl, int] of [[0.8, 26], [-2.8, 22]]) {
     const luz = new THREE.PointLight(0xffcc66, int, 13, 2);
     luz.position.set(0.4, NH - 0.6, zl);
-    g.add(luz);
+    S.add(luz);
     const bulb = new THREE.Mesh(
       new THREE.SphereGeometry(0.05, 6, 4),
       MineMaterials.plano(0xffcc44, { rough: 0.2, emissive: 0xffaa22, emissiveIntensity: 5 })
     );
     bulb.position.copy(luz.position);
-    g.add(bulb);
+    S.add(bulb);
   }
   // LED verde de zona de refugio (punto en el techo del acceso, foto)
   const ledVerde = new THREE.Mesh(
@@ -381,10 +391,11 @@ export function crear({ seed = 3, numero = 2 } = {}) {
     MineMaterials.plano(0x39ff14, { emissive: 0x39ff14, emissiveIntensity: 4 })
   );
   ledVerde.position.set(0.9, NH - 0.15, -0.5);
-  g.add(ledVerde);
+  S.add(ledVerde);
   const luzVerde = new THREE.PointLight(0x39ff14, 4, 6, 2);
   luzVerde.position.copy(ledVerde.position);
-  g.add(luzVerde);
+  luzVerde.userData.staticLight = true; // indicador verde de refugio: no lo gestiona el pool
+  S.add(luzVerde);
 
   return g;
 }

@@ -6,7 +6,11 @@ import * as THREE from 'three';
  * el headlamp del jugador), luego restaura. Punto de extension: luz de emergencia roja,
  * fallo de equipos, secuencia de reinicio.
  */
-export function createPowerOutage({ scene }) {
+export function createPowerOutage({ scene, world }) {
+  // Pausa el pool de luces: si no, su reasignacion periodica volveria a encender las luces
+  // en mitad del apagon. Se reanuda en stop().
+  if (world) world._poolPaused = true;
+
   const saved = [];
   scene.traverse((o) => {
     if (o.isLight && o.type !== 'AmbientLight') {
@@ -33,6 +37,8 @@ export function createPowerOutage({ scene }) {
         if (s.light) s.light.intensity = s.intensity;
         else if (s.mat) s.mat.emissiveIntensity = s.emissive;
       }
+      // Reanuda el pool de luces (vuelve a seguir al jugador).
+      if (world) world._poolPaused = false;
     }
   };
 }

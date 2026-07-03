@@ -37,6 +37,7 @@ export const QUALITY_PRESETS = {
     fogNear: 14,
     fogFar: 40,
     maxDynamicLights: 36,
+    lightPool: 16,          // luces reales (sin sombra) que siguen al jugador
     streamingRadius: 4      // segmentos activos a cada lado del jugador
   },
   medio: {
@@ -53,6 +54,7 @@ export const QUALITY_PRESETS = {
     fogNear: 12,
     fogFar: 30,
     maxDynamicLights: 22,
+    lightPool: 12,
     streamingRadius: 3
   },
   // Preset por defecto en celular: prioriza framerate sobre fidelidad.
@@ -70,6 +72,7 @@ export const QUALITY_PRESETS = {
     fogNear: 10,
     fogFar: 24,
     maxDynamicLights: 14,
+    lightPool: 7,
     streamingRadius: 2
   },
   bajo: {
@@ -86,6 +89,7 @@ export const QUALITY_PRESETS = {
     fogNear: 8,
     fogFar: 18,
     maxDynamicLights: 8,
+    lightPool: 5,
     streamingRadius: 2
   }
 };
@@ -109,6 +113,11 @@ class SettingsState {
     // Luminosidad de la mina: multiplicador aplicado a todas las luces de galeria
     // (PointLight/AmbientLight/HemiLight). NO afecta materiales emisivos (LEDs, cintas).
     this.brightness = 1.0;
+    // Pool de luces: un conjunto FIJO de PointLights (sin sombra) sigue al jugador en vez
+    // de mantener decenas de luces reales encendidas por todo el mapa. Cuenta constante =>
+    // no hay recompilacion de shaders al recorrer. Poner en false restaura el comportamiento
+    // antiguo (todas las luces fijas por presupuesto) si se detectara algun problema visual.
+    this.lightPoolEnabled = true;
     this._listeners = new Set();
     this._brightnessListeners = new Set();
   }

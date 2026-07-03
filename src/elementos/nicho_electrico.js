@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MineMaterials } from '../world/materials/MineMaterials.js';
 import { crear as crearTablero } from './tablero_electrico.js';
+import { sub } from './subelemento.js';
 
 /**
  * NICHO ELÉCTRICO — apertura excavada en el hastial del túnel.
@@ -115,8 +116,20 @@ function _rampColor(t) {
  * @param {number} edgeAmp  Amplitud extra de perturbación X/Y en vértices de borde.
  *                          Cuando > 0, la silueta exterior deja de ser un rectángulo perfecto.
  */
+// Cache de geometrias fBm: cada nicho pedia ~9 planos con ruido por vertice (5 octavas),
+// ~756k evaluaciones de ruido al arranque para ~25 nichos. Al cuantizar la semilla a pocas
+// VARIANTES (ver crear()), muchos nichos comparten exactamente los mismos parametros y
+// reutilizan la MISMA BufferGeometry. Reduce drasticamente el CPU de construccion.
+// IMPORTANTE: la geometria se COMPARTE entre mallas/nichos — no debe liberarse (dispose)
+// mientras el mundo siga vivo (el streaming futuro debera respetar geometrias compartidas).
+const _terrainCache = new Map();
+
 function planoRocaTerrain(w, h, segsX = 24, segsY = 20, amp = 0.18, scale = 2.8,
                           ox = 0, oy = 0, edgeAmp = 0) {
+  const key = `${w.toFixed(3)}|${h.toFixed(3)}|${segsX}|${segsY}|${amp}|${scale}|${ox.toFixed(3)}|${oy.toFixed(3)}|${edgeAmp}`;
+  const hit = _terrainCache.get(key);
+  if (hit) return hit;
+
   const geo  = new THREE.PlaneGeometry(w, h, segsX, segsY);
   const pos  = geo.attributes.position;
   const cols = new Float32Array(pos.count * 3);
@@ -162,6 +175,7 @@ function planoRocaTerrain(w, h, segsX = 24, segsY = 20, amp = 0.18, scale = 2.8,
 
   geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   geo.computeVertexNormals();
+  _terrainCache.set(key, geo);
   return geo;
 }
 
@@ -188,27 +202,34 @@ export function crear({ doble = false, conTableros = true, seed = 1 } = {}) {
   const mSuelo = MineMaterials.plano(0x1e1c18, { rough: 1.0 });
   const mCable = MineMaterials.cable();
 
-  const ox = seed * 0.37, oy = seed * 0.61;
+  // Cuantiza la semilla a 4 VARIANTES de ruido: nichos con la misma variante (y mismo W)
+  // comparten exactamente la geometria fBm cacheada. 4 aspectos distintos bastan para que
+  // el jugador no note repeticion, y el CPU de construccion cae ~4x.
+  const NUM_VARIANTES = 4;
+  const v  = ((seed % NUM_VARIANTES) + NUM_VARIANTES) % NUM_VARIANTES;
+  const ox = v * 0.37, oy = v * 0.61;
 
   // ── PARED DEL FONDO ──────────────────────────────────────────────
+  // `S` = grupo del SUBELEMENTO activo (discretización para el visor).
   // Amplitud alta: la perforadora deja la roca muy irregular
+  let S = sub(g, 'excavacion', 'Excavación (roca fBm)', 'Pared de fondo, laterales, techo y suelo de roca con desplazamiento fBm.');
   const gFondo = planoRocaTerrain(W, H, 28, 24, 0.32, 3.8, ox,      oy     );
   const fondo  = new THREE.Mesh(gFondo, mRoca);
   fondo.position.set(0, H / 2, -D);
-  g.add(fondo);
+  S.add(fondo);
 
   // ── PAREDES LATERALES ────────────────────────────────────────────
   const gLatIzq = planoRocaTerrain(D, H, 24, 24, 0.40, 4.0, ox+5.1, oy+2.3);
   const latIzq  = new THREE.Mesh(gLatIzq, mRoca);
   latIzq.position.set(-W / 2, H / 2, -D / 2);
   latIzq.rotation.y = -Math.PI / 2;
-  g.add(latIzq);
+  S.add(latIzq);
 
   const gLatDer = planoRocaTerrain(D, H, 24, 24, 0.40, 4.0, ox+9.7, oy+6.1);
   const latDer  = new THREE.Mesh(gLatDer, mRoca);
   latDer.position.set(W / 2, H / 2, -D / 2);
   latDer.rotation.y = Math.PI / 2;
-  g.add(latDer);
+  S.add(latDer);
 
   // ── TECHO ────────────────────────────────────────────────────────
   // Mayor amplitud que las paredes: el techo siempre queda más irregular
@@ -217,18 +238,19 @@ export function crear({ doble = false, conTableros = true, seed = 1 } = {}) {
   const techo  = new THREE.Mesh(gTecho, mRoca);
   techo.position.set(0, H, -D / 2);
   techo.rotation.x = Math.PI / 2;
-  g.add(techo);
+  S.add(techo);
 
   // ── SUELO ────────────────────────────────────────────────────────
   const gSuelo = planoRocaTerrain(W, D, 14, 12, 0.04, 2.2, ox+18.5, oy+11.2);
   const sueloM = new THREE.Mesh(gSuelo, mSuelo);
   sueloM.position.set(0, 0.01, -D / 2);
   sueloM.rotation.x = -Math.PI / 2;
-  g.add(sueloM);
+  S.add(sueloM);
 
   // ── BORDE DE APERTURA (rock collar con silueta IRREGULAR) ────────
   // edgeAmp > 0 perturba los vértices del borde en X/Y → la silueta ya no es un rectángulo.
   // Espesor grueso y amplia zona de perturbación → borde parece roca bruta perforada.
+  S = sub(g, 'marco_apertura', 'Marco de apertura (rock collar)', 'Borde de roca con silueta irregular alrededor de la apertura.');
   const espesor = 0.50;
   const marcoW  = W + 0.50, marcoH = H + 0.38;
   const mAmp    = 0.28;   // desplazamiento de superficie (profundidad)
@@ -244,11 +266,12 @@ export function crear({ doble = false, conTableros = true, seed = 1 } = {}) {
   for (const { geo, pos: p } of marcos) {
     const m = new THREE.Mesh(geo, mRoca);
     m.position.set(...p);
-    g.add(m);
+    S.add(m);
   }
 
   // ── TABLEROS ELÉCTRICOS (solo si conTableros=true) ────────────────
   if (conTableros) {
+    S = sub(g, 'tableros', 'Tableros eléctricos y cables', 'Tableros empotrados al fondo + cables colgando del techo.');
     const posTabl = doble
       ? [[-0.42, 0, -D + 0.40], [0.42, 0, -D + 0.40]]
       : [[0,    0, -D + 0.40]];
@@ -256,7 +279,7 @@ export function crear({ doble = false, conTableros = true, seed = 1 } = {}) {
       const tablero = crearTablero();
       tablero.position.set(tx, ty, tz);
       tablero.rotation.y = Math.PI;
-      g.add(tablero);
+      S.add(tablero);
       if (tablero.userData?.interactable) {
         g.userData._tableroInteractable = tablero.userData.interactable;
       }
@@ -275,10 +298,11 @@ export function crear({ doble = false, conTableros = true, seed = 1 } = {}) {
       cable.position.set(cx, H - len / 2 - 0.06, cz);
       cable.rotation.z = ((seed + i) % 7 - 3) * 0.07;
       cable.rotation.x = ((seed + i * 2) % 5 - 2) * 0.05;
-      g.add(cable);
+      S.add(cable);
     }
   } else {
     // Nicho vacío: solo un par de cables sueltos / pintura desgastada
+    S = sub(g, 'cables', 'Cables sueltos', 'Cables colgando en el nicho vacío.');
     for (let i = 0; i < 2; i++) {
       const len = 0.55 + i * 0.20;
       const cable = new THREE.Mesh(
@@ -286,34 +310,36 @@ export function crear({ doble = false, conTableros = true, seed = 1 } = {}) {
       );
       cable.position.set((i === 0 ? -0.28 : 0.28), H - len / 2 - 0.06, -D * 0.4);
       cable.rotation.z = (i === 0 ? -1 : 1) * 0.18;
-      g.add(cable);
+      S.add(cable);
     }
   }
 
   // ── ESCORRENTÍA / HUMEDAD ─────────────────────────────────────────
   if (seed % 2 === 0) {
+    S = sub(g, 'humedad', 'Escorrentía / humedad', 'Mancha húmeda brillante en la pared lateral.');
     const mAgua = MineMaterials.plano(0x0c0c0a, { rough: 0.10 });
     const hGeo  = planoRocaTerrain(
-      0.24 + (seed % 4) * 0.06, 0.70 + (seed % 3) * 0.14,
+      0.24 + (v % 4) * 0.06, 0.70 + (v % 3) * 0.14,
       6, 12, 0.028, 1.8, ox + 40, oy + 15
     );
     const hm   = new THREE.Mesh(hGeo, mAgua);
     const lado = seed % 4 < 2 ? -1 : 1;
     hm.position.set(lado * (W / 2 - 0.01), H * 0.42, -D * 0.55);
     hm.rotation.y = lado < 0 ? -Math.PI / 2 + 0.012 : Math.PI / 2 - 0.012;
-    g.add(hm);
+    S.add(hm);
   }
 
   // ── LUZ INTERIOR ─────────────────────────────────────────────────
+  S = sub(g, 'luz_interior', 'Luz interior', 'Foco cálido + luz puntual dentro del nicho.');
   const bulbMat = MineMaterials.plano(0xffcc44,
     { rough: 0.25, emissive: 0xffaa22, emissiveIntensity: 4.5 });
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), bulbMat);
   bulb.position.set(0, H - 0.12, -D * 0.42);
-  g.add(bulb);
+  S.add(bulb);
 
   const luz = new THREE.PointLight(0xffcc66, 10, 7, 2);
   luz.position.copy(bulb.position);
-  g.add(luz);
+  S.add(luz);
 
   return g;
 }

@@ -31,8 +31,15 @@ export class LightingRig {
     return Math.min(8, this.budget);
   }
 
-  /** ¿Queda presupuesto para una luz real cerca de la camara? */
+  /**
+   * ¿Se puede crear una luz real?
+   * Con el POOL activo (World reemplaza las luces ambientales por un conjunto fijo que sigue
+   * al jugador) permitimos crearlas TODAS: World las "cosecha" como specs y elimina las
+   * originales, asi que el mapa entero queda iluminado sin inflar el conteo final de shader.
+   * Con el pool desactivado se respeta el presupuesto clasico (primeras N luces reales).
+   */
   canAddLight() {
+    if (this.settings.lightPoolEnabled) return true;
     return this._activeLights < this.budget;
   }
 

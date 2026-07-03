@@ -83,20 +83,98 @@ export class World {
     for (const seg of this.segments) {
       seg.group.traverse((o) => { if (o.isLight) lights.push(o); });
     }
-    // `attach` conserva la transformada de mundo al cambiar de padre.
+
+    // Una luz es "pooleable" si es una fuente ambiental normal SIN sombra y NO es un
+    // indicador/animada marcado como staticLight. Las de sombra (LED blanco de techo) y los
+    // indicadores (estado de refugio) se mantienen FIJAS: sus sombras estan horneadas y sus
+    // colores son informativos, no deben moverse.
+    const poolable = [];
+    const wp = new THREE.Vector3();
     for (const light of lights) {
-      this.lightsGroup.attach(light);
-      // Guarda la intensidad original para poder escalarla con el control de luminosidad.
-      light.userData.baseIntensity = light.intensity;
+      const esPool = Settings.lightPoolEnabled
+        && !light.castShadow
+        && !light.userData.staticLight
+        && !light.userData.tick;
+      if (esPool) {
+        light.getWorldPosition(wp);
+        poolable.push({
+          x: wp.x, y: wp.y, z: wp.z,
+          color: light.color.getHex(),
+          intensity: light.intensity,
+          distance: light.distance,
+          decay: light.decay,
+          _d2: Infinity
+        });
+      } else {
+        // Fija: reparent conservando transform de mundo.
+        this.lightsGroup.attach(light);
+        light.userData.baseIntensity = light.intensity;
+      }
+    }
+
+    // Quita de la escena las luces pooleables originales (las reemplaza el pool).
+    if (Settings.lightPoolEnabled) {
+      for (const light of lights) {
+        if (!light.castShadow && !light.userData.staticLight && !light.userData.tick) {
+          light.parent?.remove(light);
+        }
+      }
+    }
+
+    // Crea el POOL: un conjunto FIJO de PointLights que se reasignan a las fuentes mas
+    // cercanas al jugador cada pocos frames. El conteo total de luces es constante -> no hay
+    // recompilacion de shaders al recorrer, y solo N luces entran en el bucle por fragmento.
+    this._lightSpecs = poolable;
+    this._poolLights = [];
+    if (Settings.lightPoolEnabled && poolable.length) {
+      const poolSize = Math.min(Settings.current.lightPool ?? 12, poolable.length);
+      for (let i = 0; i < poolSize; i++) {
+        const pl = new THREE.PointLight(0xffffff, 0, 10, 2);
+        pl.castShadow = false;
+        this.lightsGroup.add(pl);
+        this._poolLights.push(pl);
+      }
+      this._lightAccum = 0;
+      this._assignPoolLights();
     }
 
     // Reacciona al control de luminosidad del jugador en tiempo real.
-    Settings.onBrightness((v) => this._applyBrightness(v));
+    Settings.onBrightness((v) => { this._applyBrightness(v); this._assignPoolLights(); });
     // Aplica la luminosidad inicial (por si el usuario ya la cambió antes de entrar).
     this._applyBrightness(Settings.brightness);
   }
 
-  /** Escala la intensidad de todas las luces pinadas sin tocar emissive/materials. */
+  /**
+   * Reasigna las luces del pool a las `_lightSpecs` mas cercanas al jugador. Constante en
+   * numero de luces (no recompila); O(specs log specs) por el sort, con specs acotado.
+   */
+  _assignPoolLights() {
+    const pool = this._poolLights;
+    if (!pool || !pool.length || this._poolPaused) return;
+    const specs = this._lightSpecs;
+    const px = this._playerPos.x, py = this._playerPos.y, pz = this._playerPos.z;
+    for (const s of specs) {
+      const dx = s.x - px, dy = s.y - py, dz = s.z - pz;
+      s._d2 = dx * dx + dy * dy + dz * dz;
+    }
+    specs.sort((a, b) => a._d2 - b._d2);
+    const b = Settings.brightness;
+    for (let i = 0; i < pool.length; i++) {
+      const pl = pool[i];
+      const s = specs[i];
+      if (s) {
+        pl.position.set(s.x, s.y, s.z);
+        pl.color.setHex(s.color);
+        pl.distance = s.distance;
+        pl.decay = s.decay;
+        pl.intensity = s.intensity * b;
+      } else {
+        pl.intensity = 0;
+      }
+    }
+  }
+
+  /** Escala la intensidad de las luces FIJAS sin tocar emissive/materials (el pool se escala aparte). */
   _applyBrightness(factor) {
     this.lightsGroup?.traverse((o) => {
       if (o.isLight && o.userData.baseIntensity !== undefined) {
@@ -125,6 +203,16 @@ export class World {
 
       if (visible && seg.animated.length) {
         for (const obj of seg.animated) obj.userData.tick?.(dt, elapsed);
+      }
+    }
+
+    // Pool de luces: reasigna las luces reales a las fuentes mas cercanas ~cada 0.12 s.
+    // No cada frame (el sort es innecesario a 60 Hz) y los cambios ocurren tras la niebla.
+    if (this._poolLights && this._poolLights.length) {
+      this._lightAccum += dt;
+      if (this._lightAccum >= 0.12) {
+        this._lightAccum = 0;
+        this._assignPoolLights();
       }
     }
     // TODO(extension): descargar (disposeObject) y regenerar tramos para mundos infinitos.
