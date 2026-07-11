@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
-  texturaRoca, texturaShotcrete, texturaBarro, texturaLodo, texturaMetal, texturaGrunge
+  texturaRoca, texturaShotcrete, texturaBarro, texturaLodo, texturaMetal, texturaGrunge,
+  texturaRocaTunel, texturaRocaTunelNormal, texturaRocaTunelRough
 } from './Texturas.js';
 
 /**
@@ -63,26 +64,40 @@ class MaterialLibrary {
   }
 
   /**
-   * Roca de tunel subterraneo con colores por vertice fBM (misma tecnica que
-   * webgl_geometry_terrain_raycast). Sin flatShading → shading suave sobre la
-   * geometria desplazada, igual que el terrain example. vertexColors:true activa
-   * el atributo 'color' generado en TunnelGeometry.createTunnelShell().
+   * Roca de tunel subterraneo: colores por vertice fBM (tecnica del terrain_raycast) MÁS
+   * textura de caliza real y NORMAL MAP (grano/relieve 3D bajo la luz del headlamp), calibrada
+   * al escaneo por fotogrametria de la galeria real. El `map` (gris medio) MODULA el color por
+   * vertice sin aplanarlo; el `normalMap` da la rugosidad de roca. vertexColors sigue activo.
    */
   rocaTunel() {
-    return this._get('rocaTunel', () =>
-      new THREE.MeshStandardMaterial({
+    return this._get('rocaTunel', () => {
+      const nrm = texturaRocaTunelNormal();
+      return new THREE.MeshStandardMaterial({
         color:        0xffffff,
+        map:          texturaRocaTunel(),
+        normalMap:    nrm,
+        // Relieve mas marcado (antes 0.85): la roca se ve mas tridimensional bajo el headlamp
+        // sin coste extra (el normalMap ya se muestrea). Aporta realismo en todos los presets.
+        normalScale:  new THREE.Vector2(1.05, 1.05),
+        // Humedad diferencial: el roughnessMap MODULA la rugosidad → la roca brilla mojada
+        // en escurrimientos/manchas y sigue mate en seco. roughness=1.0 deja que el mapa
+        // mande (base clara del mapa ≈0.94 → sigue mate; vetas oscuras ≈0.25 → brillo humedo).
+        // Coste: 1 sampler extra sobre una textura ya cacheada. Aporta en TODOS los presets.
+        roughnessMap: texturaRocaTunelRough(),
         roughness:    1.0,
         metalness:    0.0,
         vertexColors: true,
         emissive:          0x1c150e,
         emissiveIntensity: 0.35,
+        // envMap (scene.environment) bajo: la roca es matte y grande → un reflejo/IBL fuerte
+        // aclararia los hastiales y romperia la "regla de oro". Solo un matiz humedo sutil.
+        envMapIntensity: 0.16,
         // DoubleSide: al cruzar el shell del tunel (p.ej. entrando a un nicho),
         // la cara trasera sigue renderizando roca → sin "agujero negro" ni perdida de
         // visualizacion. No hay impacto perceptible en la vista normal desde el tunel.
         side: THREE.DoubleSide
-      })
-    );
+      });
+    });
   }
 
   rocaMineralizada() {
@@ -105,7 +120,9 @@ class MaterialLibrary {
         color: fresco ? 0xffffff : 0xb8b8b0,
         map: texturaShotcrete(),
         roughness: 0.95,
-        metalness: 0
+        metalness: 0,
+        // Superficie matte grande → env-map muy contenido para no aclarar la labor.
+        envMapIntensity: 0.16
       })
     );
   }
@@ -117,16 +134,20 @@ class MaterialLibrary {
     );
   }
 
-  /** Barro/suelo mojado: humedo pero sin brillo exagerado. */
+  /** Barro/suelo mojado: humedo, con lamina de agua reflectiva pero controlada. */
   barroMojado() {
     return this._get('barro', () =>
       new THREE.MeshPhysicalMaterial({
         color: 0x9a9088,
         map: texturaBarro(),
-        roughness: 0.60,
+        // Mas mojado (md: piso muy reflectivo, casi en todas las escenas): baja la rugosidad
+        // y sube el clearcoat/lo hace mas liso para que el env-map (LED/bombillas) espeje en el
+        // piso. Sigue siendo piso (no charco), asi que el reflejo es difuso, no de espejo.
+        roughness: 0.52,
         metalness: 0.1,
-        clearcoat: 0.20,
-        clearcoatRoughness: 0.45
+        clearcoat: 0.35,
+        clearcoatRoughness: 0.30,
+        envMapIntensity: 0.5
       })
     );
   }
@@ -145,16 +166,19 @@ class MaterialLibrary {
     );
   }
 
-  /** Charco: agua estancada, oscura, ligeramente reflectiva. */
+  /** Charco: agua estancada oscura, casi espejo. Refleja el env-map (LED/bombillas/banners). */
   charco() {
     return this._get('charco', () =>
       new THREE.MeshPhysicalMaterial({
         color: 0x05060a,
-        roughness: 0.20,
+        // Casi liso → refleja el entorno como agua real. Con scene.environment asignado, el
+        // md se cumple: "mirror-like reflection of yellow banners", "red halos in the puddles".
+        roughness: 0.12,
         metalness: 0.0,
-        clearcoat: 0.33,
-        clearcoatRoughness: 0.12,
-        reflectivity: 0.33
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.08,
+        reflectivity: 0.45,
+        envMapIntensity: 0.9
       })
     );
   }
@@ -162,7 +186,7 @@ class MaterialLibrary {
   // -- Metales --
   acero() {
     return this._get('acero', () =>
-      new THREE.MeshStandardMaterial({ color: PALETTE.acero, map: texturaMetal(), roughness: 0.65, metalness: 0.28 })
+      new THREE.MeshStandardMaterial({ color: PALETTE.acero, map: texturaMetal(), roughness: 0.65, metalness: 0.28, envMapIntensity: 0.4 })
     );
   }
 
@@ -181,13 +205,13 @@ class MaterialLibrary {
   // -- Instalaciones / equipos --
   ventNaranja() {
     return this._get('ventN', () =>
-      new THREE.MeshStandardMaterial({ color: PALETTE.ventNaranja, map: texturaGrunge(), roughness: 0.8, metalness: 0.1 })
+      new THREE.MeshStandardMaterial({ color: PALETTE.ventNaranja, map: texturaGrunge(), roughness: 0.8, metalness: 0.1, envMapIntensity: 0.3 })
     );
   }
 
   panelNaranja() {
     return this._get('panelN', () =>
-      new THREE.MeshStandardMaterial({ color: PALETTE.panelNaranja, map: texturaGrunge(), roughness: 0.78, metalness: 0.13 })
+      new THREE.MeshStandardMaterial({ color: PALETTE.panelNaranja, map: texturaGrunge(), roughness: 0.78, metalness: 0.13, envMapIntensity: 0.3 })
     );
   }
 
@@ -232,7 +256,10 @@ class MaterialLibrary {
       new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: 0xffffff,
-        emissiveIntensity: 3.0,
+        // Emisivo moderado: antes (3.0) el bloom de la barra del techo "empañaba" la vista
+        // al mirar hacia arriba. Bajado a 1.4 → la luminaria sigue brillando pero su halo no
+        // vela la corona de la labor. La iluminacion REAL la aporta el PointLight de LinearLed.
+        emissiveIntensity: 1.4,
         roughness: 0.4
       })
     );

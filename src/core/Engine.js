@@ -5,27 +5,38 @@ import { Device } from './Device.js';
 import { EventBus } from './EventBus.js';
 import { Renderer } from './Renderer.js';
 import { SceneManager } from './SceneManager.js';
+import { crearEnvMapMina } from './EnvMap.js';
 import { Loop } from './Loop.js';
 import { Input } from './Input.js';
 import { AssetLoader } from './AssetLoader.js';
 import { InteractionSystem } from './InteractionSystem.js';
 import { HazardSystem } from './HazardSystem.js';
 import { PostFX } from './PostFX.js';
+import { PerfMonitor } from './PerfMonitor.js';
 
 import { Physics } from '../physics/Physics.js';
 import { LightingRig } from '../lighting/LightingRig.js';
 import { World } from '../world/World.js';
+import { GridWorld } from '../world/grid/GridWorld.js';
 import { Player } from '../player/Player.js';
 import { BoundsGuard } from '../player/BoundsGuard.js';
+import { GridBoundsGuard } from '../player/GridBoundsGuard.js';
 import { DustSystem } from '../particles/Dust.js';
 import { MistSystem } from '../particles/Mist.js';
+import { WorkFX } from '../particles/WorkFX.js';
+import { WorkSiteSystem } from '../world/WorkSiteSystem.js';
+import { WorkCrewSystem } from '../world/WorkCrewSystem.js';
 import { AudioManager } from '../audio/AudioManager.js';
 import { HUD } from '../ui/HUD.js';
 import { Minimap } from '../ui/Minimap.js';
 import { TouchControls } from '../ui/TouchControls.js';
 
 import { VehicleSystem } from '../world/VehicleSystem.js';
+import { DriveController } from '../world/DriveController.js';
+import { HaulCycle } from '../world/HaulCycle.js';
+import { crear as crearScoop } from '../elementos/scoop.js';
 import { NPCManager } from '../ai/NPCManager.js';
+import { precargarMinero } from '../elementos/minero.js';
 import { EventDirector } from '../events/EventDirector.js';
 import { MissionManager } from '../missions/MissionManager.js';
 
@@ -50,6 +61,11 @@ export class Engine {
     this.renderer = new Renderer(container);
     this.sceneManager = new SceneManager();
     this.scene = this.sceneManager.scene;
+
+    // Mapa de entorno OSCURO: reflejos plausibles en charcos/agua y metal (md: charcos que
+    // espejan LED/banners). Se hornea una vez aqui (ya existen renderer y escena). No aclara
+    // la labor: es casi negro y las superficies matte llevan envMapIntensity bajo.
+    this.scene.environment = crearEnvMapMina(this.renderer.instance);
 
     this.camera = new THREE.PerspectiveCamera(
       75,
@@ -83,8 +99,10 @@ export class Engine {
     this.lighting = new LightingRig({ scene: this.scene, settings: Settings });
 
     await tick();
-    onStatus('Generando galerias (procedural)…');
-    this.world = new World({
+    const modoGrid = Settings.worldMode === 'grid';
+    onStatus(modoGrid ? 'Trazando el plano de mina (retícula)…' : 'Generando galerias (procedural)…');
+    const WorldClass = modoGrid ? GridWorld : World;
+    this.world = new WorldClass({
       scene: this.scene,
       physics: this.physics,
       assets: this.assets,
@@ -97,9 +115,17 @@ export class Engine {
     });
 
     await tick();
-    // Vehiculos: recorren el mapa completo en via de un solo sentido (loop continuo).
-    this.vehicleSystem = new VehicleSystem({ scene: this.scene, world: this.world, bus: this.bus });
+    // Vehiculos: en modo lineal recorren el trazado; en modo grid recorren el circuito de la
+    // via principal RN 96 (world.vehicleRoutes).
+    this.vehicleSystem = new VehicleSystem({
+      scene: this.scene, world: this.world, bus: this.bus,
+      routes: this.world.vehicleRoutes
+    });
     for (const hz of this.vehicleSystem.hazards) this.world.hazards.push(hz);
+
+    await tick();
+    onStatus('Cargando modelo del minero (FBX)…');
+    await precargarMinero();   // clona por jugador/NPC; si falla, se usa la persona procedural
 
     await tick();
     onStatus('Equipando al minero…');
@@ -113,10 +139,99 @@ export class Engine {
     });
 
     // Red de seguridad de contencion: impide que el jugador se quede fuera del mapa.
-    this.boundsGuard = new BoundsGuard({ player: this.player, world: this.world });
+    // El mundo en retícula expone boundsCheck() (cajas orientadas) → GridBoundsGuard.
+    this.boundsGuard = typeof this.world.boundsCheck === 'function'
+      ? new GridBoundsGuard({ player: this.player, world: this.world })
+      : new BoundsGuard({ player: this.player, world: this.world });
 
     this.interaction = new InteractionSystem(this.camera, this.input, this.bus);
     this.world.registerInteractables(this.interaction);
+
+    // ── CONDUCCION: todos los vehiculos de la mina son operables con E ──
+    this.drive = new DriveController({
+      scene: this.scene,
+      camera: this.camera,
+      input: this.input,
+      bus: this.bus,
+      interaction: this.interaction,
+      player: this.player,
+      world: this.world
+    });
+
+    // Scoop OPERABLE: estacionado cerca del spawn; el jugador se sube con E y lo conduce.
+    // En modo retícula el spawn está al sur de la vía principal y el interior queda al NORTE
+    // (+Z), así que aparcamos el scoop hacia dentro (+Z) en vez de -Z (que ahí es pared).
+    const scoopPos = this.world.spawnPoint.clone();
+    const scoopYaw = modoGrid ? 0 : Math.PI;
+    if (modoGrid) scoopPos.set(scoopPos.x, 0, scoopPos.z + 12);
+    else scoopPos.set(scoopPos.x + 1.4, 0, scoopPos.z - 10);
+    const scoopSpawn = crearScoop();
+    scoopSpawn.position.copy(scoopPos);
+    scoopSpawn.rotation.y = scoopYaw; // mira hacia dentro de la mina
+    scoopSpawn.userData.scoop.setManual();
+    this.scene.add(scoopSpawn);
+    this.drive.addVehicle(scoopSpawn, {
+      nombre: 'Scoop', maxSpeed: 3.2, halfLen: 3.6, tick: true, alwaysTick: true
+    });
+
+    // FLOTA conducible: volquetes y camionetas se ceden al jugador (modo manual) y al
+    // soltarlos retoman su circuito suavemente.
+    for (const m of this.vehicleSystem.vehicles) {
+      const esCamion = m.name === 'camion';
+      this.drive.addVehicle(m, {
+        nombre: esCamion ? 'Volquete' : 'Camioneta',
+        maxSpeed: esCamion ? 4.5 : 6.0,
+        turnRate: esCamion ? 0.9 : 1.3,
+        halfLen: esCamion ? 4.4 : 3.0,
+        camDist: esCamion ? 11.5 : 8.5,
+        camUp: esCamion ? 5.8 : 4.4,
+        tick: true,
+        onBoard: (mesh) => this.vehicleSystem.setManual(mesh, true),
+        onExit:  (mesh) => this.vehicleSystem.setManual(mesh, false)
+      });
+    }
+
+    // EQUIPOS DE LABOR conducibles (salas de la reticula): scoop de la camara, Raptor,
+    // desatador, empernador, shotcretera, mixer y telehandler. Los jumbos de las BAHIAS
+    // con LOTO se excluyen a proposito: un equipo bloqueado/etiquetado NO se opera.
+    const CONDUCIBLES = {
+      scoop:            { nombre: 'Scoop',        maxSpeed: 3.2, halfLen: 3.6, tick: false },
+      raptor:           { nombre: 'Jumbo Raptor', maxSpeed: 2.0, halfLen: 4.6, camDist: 11.5, camUp: 5.6 },
+      desatador:        { nombre: 'Desatador',    maxSpeed: 2.2, halfLen: 4.2, camDist: 10.5, camUp: 5.2 },
+      empernador:       { nombre: 'Empernador',   maxSpeed: 2.0, halfLen: 4.4, camDist: 10.5, camUp: 5.2 },
+      shotcretera:      { nombre: 'Shotcretera',  maxSpeed: 2.4, halfLen: 4.2, camDist: 10.5, camUp: 5.2 },
+      mixer:            { nombre: 'Mixer',        maxSpeed: 2.6, halfLen: 4.0, camDist: 10.5, camUp: 5.2 },
+      telehandler:      { nombre: 'Telehandler',  maxSpeed: 2.8, halfLen: 3.2 },
+      telehandler_paus: { nombre: 'Telehandler',  maxSpeed: 2.8, halfLen: 3.2 }
+    };
+    for (const seg of this.world.segments) {
+      if (seg.type !== 'room') continue;
+      for (const [nombre, cfg] of Object.entries(CONDUCIBLES)) {
+        const obj = seg.group.getObjectByName(nombre);
+        if (obj && !obj.userData._drivable) {
+          obj.userData._drivable = true;
+          this.drive.addVehicle(obj, cfg);
+        }
+      }
+    }
+
+    // ── ACARREO REAL: ciclo autonomo del LHD en la camara (muck de la pila) ──
+    this.haul = new HaulCycle({ world: this.world, bus: this.bus });
+
+    // Camiones cargados/vacios: puntos de carga (acceso a la camara, c0_r2) y descarga
+    // (echadero, c2_r3) sobre el circuito de la RN 96.
+    const nodo = (id) => this.world.segments.find(s => s.nodeId === id);
+    const carga = nodo('c0_r2'), descarga = nodo('c2_r3');
+    if (carga && descarga) this.vehicleSystem.setCargoPoints(carga.group.position, descarga.group.position);
+
+    // Los NPC se refugian ante el equipo que CONDUCE el jugador Y ante el scoop autonomo del
+    // acarreo: el VehicleSystem reparte esas posiciones junto a las de la flota.
+    this.vehicleSystem.setExtraPositions(() => {
+      const arr = [];
+      if (this.drive.active) arr.push(this.drive.active.mesh.position);
+      const hp = this.haul.vehiclePos; if (hp) arr.push(hp);
+      return arr;
+    });
 
     // Asegura matrices de mundo actualizadas antes de medir las cajas de los peligros.
     this.scene.updateMatrixWorld(true);
@@ -132,6 +247,15 @@ export class Engine {
     this.dust = new DustSystem({ scene: this.scene, camera: this.camera, settings: Settings });
     this.mist = new MistSystem({ scene: this.scene, settings: Settings });
     this.audio = new AudioManager({ camera: this.camera, settings: Settings, bus: this.bus });
+    // El motor diesel de proximidad sigue al vehiculo de la flota mas cercano a la camara.
+    this.audio.setVehicles(this.vehicleSystem.vehicles);
+
+    // Labores VIVAS: sonido sintetizado (percusion/hiss/bomba) + polvo/spray por distancia.
+    this.workFX = new WorkFX({ scene: this.scene });
+    this.workSites = new WorkSiteSystem({ world: this.world, bus: this.bus, audio: this.audio, fx: this.workFX });
+    // Cuadrillas HUMANAS en las labores activas (perforista, sostenimiento, boquillero, vigia):
+    // se crean/retiran por proximidad. Complementa a workSites (que anima solo las maquinas).
+    this.workCrews = new WorkCrewSystem({ world: this.world, bus: this.bus, scene: this.scene });
 
     await tick();
     onStatus('Preparando interfaz…');
@@ -167,15 +291,24 @@ export class Engine {
     this.loop.add(this.boundsGuard);   // contencion: reubica si escapo del mapa (tras la fisica)
     this.loop.add(this.world);         // streaming de tramos (update)
     this.loop.add(this.vehicleSystem); // mueve la flota por el mapa completo
+    this.loop.add(this.haul);          // ciclo autonomo del LHD en la camara
     this.loop.add(this.npcs);
     this.loop.add(this.eventDirector);
     this.loop.add(this.interaction);
+    this.loop.add(this.drive);         // tras interaction: su chase cam pisa la del Player
     this.loop.add(this.hazardSystem);
     this.loop.add(this.dust);
     this.loop.add(this.mist);
+    this.loop.add(this.workSites);   // elige emisores de labor por distancia
+    this.loop.add(this.workCrews);   // cuadrillas humanas en las labores (spawn por proximidad)
+    this.loop.add(this.workFX);      // integra las particulas de las labores
     this.loop.add(this.audio);
     this.loop.add(this.hud);
     this.loop.add(this.minimap);
+
+    // Monitor de rendimiento adaptativo: ajusta la calidad al vuelo segun los FPS reales.
+    this.perfMonitor = new PerfMonitor({ bus: this.bus });
+    this.loop.add(this.perfMonitor);
 
     // Arranca el render (la escena se ve detras de la pantalla de inicio).
     this.loop.start();
