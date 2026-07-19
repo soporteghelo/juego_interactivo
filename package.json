@@ -1,13 +1,14 @@
 {
-  "name": "simulador-mina-cerro-lindo",
+  "name": "simulador-mina-subterranea",
   "version": "0.1.0",
-  "description": "Simulador/juego de mina subterranea hiperrealista (Cerro Lindo, NEXA/AESA) en Three.js. Entrenamiento operacional, seguridad y recorridos virtuales.",
+  "description": "Simulador/juego de mina subterranea hiperrealista (NEXA) en Three.js. Entrenamiento operacional, seguridad y recorridos virtuales.",
   "type": "module",
   "scripts": {
-    "dev":       "vite --port 5000",
+    "dev": "vite --port 5000",
     "dev:visor": "vite --config vite.visor.config.js --port 5001",
-    "build":     "vite build",
-    "preview":   "vite preview"
+    "build": "vite build",
+    "build:visor": "node build-visor.mjs",
+    "preview": "vite preview"
   },
   "keywords": [
     "threejs",
@@ -24,6 +25,7 @@
     "three": "^0.166.1"
   },
   "devDependencies": {
+    "playwright": "^1.61.1",
     "vite": "^5.4.0"
   },
   "engines": {

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CharacterController } from './CharacterController.js';
 import { CameraRig } from './CameraRig.js';
 import { Headlamp } from './Headlamp.js';
-import { crear as crearPersona, animarMarcha } from '../elementos/persona.js';
+import { crear as crearMinero, actualizar as actualizarMinero } from '../elementos/personas/minero.js';
 
 /**
  * Jugador: integra el controlador de personaje, la camara (1a/3a) y la linterna.
@@ -42,9 +42,8 @@ export class Player {
   }
 
   _buildMinerMesh() {
-    // Avatar en 3a persona: minero articulado con EPP (persona del catalogo de elementos).
-    const g = crearPersona({ rol: 'operador' });
-    g.userData.tick = null;  // el Player controla su animacion (marcha)
+    // Avatar en 3a persona: minero FBX rigged (Mixamo) con EPP; el Player controla su animacion.
+    const g = crearMinero({ rol: 'operador' });
     g.visible = false;       // arranca en 1a persona
     this.scene.add(g);
     this.mesh = g;
@@ -100,22 +99,24 @@ export class Player {
     this.mesh.position.set(pos.x, pos.y - 1.05, pos.z);
     this.mesh.rotation.y = this.rig.yaw + Math.PI;
 
-    // Marcha del avatar segun la velocidad de movimiento.
+    // Animacion del avatar (esqueleto FBX) segun la velocidad de movimiento. La velocidad REAL
+    // de avance (desplazamiento XZ / dt) sincroniza la cadencia del clip → los pies no patinan.
     if (this.mesh.visible) {
       const mv = this.input.move;
       const moviendo = this.input.enabled && (Math.abs(mv.x) + Math.abs(mv.y)) > 0.15;
-      if (moviendo) {
-        this._phase += dt * (this.input.isDown('run') ? 14 : 9);
-        animarMarcha(this.mesh, this._phase, 0.6);
-      } else {
-        animarMarcha(this.mesh, elapsed * 1.5, 0.06); // idle
-      }
+      const corriendo = this.input.isDown('run');
+      if (!this._avatarLast) this._avatarLast = { x: pos.x, z: pos.z };
+      const vel = dt > 1e-5 ? Math.hypot(pos.x - this._avatarLast.x, pos.z - this._avatarLast.z) / dt : 0;
+      this._avatarLast.x = pos.x; this._avatarLast.z = pos.z;
+      actualizarMinero(this.mesh, dt, moviendo, corriendo, vel);
     }
 
-    // Notifica posicion para streaming/audio (a ~10 Hz).
+    // Notifica posicion para streaming/audio (a ~10 Hz). `pie:true` distingue la marcha
+    // a pie del scoop conducido (que tambien emite player:moved): el AudioManager solo
+    // sintetiza PASOS con los eventos a pie.
     if (elapsed - this._lastEmit > 0.1) {
       this._lastEmit = elapsed;
-      this.bus.emit('player:moved', { position: pos.clone(), yaw: this.rig.yaw });
+      this.bus.emit('player:moved', { position: pos.clone(), yaw: this.rig.yaw, pie: true });
     }
   }
 }

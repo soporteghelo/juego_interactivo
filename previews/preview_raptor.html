@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview — Raptor (módulo raptor.js)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #cfd6dd; overflow: hidden; font-family: system-ui, sans-serif; }
+    #status { position:fixed; bottom:12px; left:12px; z-index:10; color:#123; background:rgba(255,255,255,.6); padding:6px 10px; border-radius:6px; font-size:12px; }
+    #views  { position:fixed; top:12px; left:12px; z-index:10; font-size:12px; color:#123; background:rgba(255,255,255,.6); padding:6px 10px; border-radius:6px; }
+    #views a { color:#0a5; text-decoration:none; margin-right:8px; }
+  </style>
+</head>
+<body>
+  <div id="views">
+    Vistas:
+    <a href="#view=3q">3/4</a><a href="#view=side">lateral</a><a href="#view=front">frente</a>
+    <a href="#view=rear3q">3/4 tras.</a><a href="#view=top">planta</a><a href="#view=boom">brazo/feed</a>
+  </div>
+  <div id="status">Cargando…</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+    import { crear as crearRaptor } from '../src/elementos/equipos/raptor.js';
+
+    const readParams = () => new URLSearchParams(location.hash.slice(1));
+    let view = readParams().get('view') || '3q';
+    const rot = parseFloat(readParams().get('rot') || '0');
+
+    const statusEl = document.getElementById('status');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xcfd6dd);
+
+    const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 200);
+    const controls = new OrbitControls(camera, renderer.domElement);
+
+    // Cámaras fijas para juzgar la FORMA desde ángulos canónicos.
+    const VIEWS = {
+      '3q':    [ 12,  7.0, 13 ],   // tres cuartos frontal (brazo hacia la cámara)
+      'side':  [ 17,  4.5,  0 ],   // lateral puro (como la foto de referencia)
+      'front': [  0,  4.2, 16 ],   // frente (brazo/feed)
+      'rear3q':[-12,  7.0,-13 ],   // tres cuartos trasero (power pack)
+      'top':   [  0.1, 20,  0.1 ], // planta
+      'boom':  [  4.0, 3.2,  5.0 ] // acercamiento al ensamblaje brazo/viga/canasta
+    };
+    function applyView(v) {
+      view = v;
+      controls.target.set(0, v === 'boom' ? 2.6 : 1.4, v === 'boom' ? 3.6 : 0.4);
+      camera.position.set(...(VIEWS[v] || VIEWS['3q']));
+      statusEl.textContent = '✓ Raptor — view=' + v;
+    }
+    addEventListener('hashchange', () => applyView(readParams().get('view') || '3q'));
+
+    scene.add(new THREE.HemisphereLight(0xdfe8f2, 0x555049, 1.0));
+    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    key.position.set(8, 13, 9); key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 44 });
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xbcd0ff, 0.8);
+    fill.position.set(-7, 5, -6); scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.9);
+    rim.position.set(-4, 6, 8); scene.add(rim);
+
+    const piso = new THREE.Mesh(new THREE.CircleGeometry(30, 48),
+      new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 1 }));
+    piso.rotation.x = -Math.PI / 2; piso.receiveShadow = true; scene.add(piso);
+    const grid = new THREE.GridHelper(30, 30, 0x77808a, 0x8b939c);
+    grid.position.y = 0.003; scene.add(grid);
+
+    let raptor;
+    try {
+      raptor = crearRaptor();
+      raptor.rotation.y = rot;
+      raptor.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(raptor);
+      applyView(view);
+    } catch (e) {
+      statusEl.textContent = 'ERROR: ' + e.message;
+      console.error(e);
+    }
+
+    const clock = new THREE.Clock();
+    let elapsed = 0;
+    function animate() {
+      const dt = clock.getDelta();
+      elapsed += dt; raptor?.userData.tick?.(dt, elapsed);
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    animate();
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

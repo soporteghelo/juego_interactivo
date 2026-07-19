@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview — Scoop / LHD (módulo scoop.js del juego)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #14100c; overflow: hidden; font-family: system-ui, sans-serif; }
+    #hud { position: fixed; top: 12px; left: 12px; z-index: 10; color: #ffd9a0;
+           background: rgba(0,0,0,.5); padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+    #hud b { color: #fff; }
+    #hud button { background:#2a2016; color:#ffd9a0; border:1px solid #6b4f2a; border-radius:6px;
+                  padding:4px 10px; margin-right:6px; cursor:pointer; font-size:12px; }
+    #hud button.on { background:#7a5a2a; color:#fff; }
+    #status { position:fixed; bottom:12px; left:12px; z-index:10; color:#9fd0ff;
+              background:rgba(0,0,0,.5); padding:6px 10px; border-radius:6px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div><b>Scoop / LHD</b> — usa el módulo <code>src/elementos/equipos/scoop.js</code></div>
+    <div style="margin-top:6px">
+      <button data-a="turn" class="on">Giro auto</button>
+      <button data-a="cycle" class="on">Ciclo de carga</button>
+      <button data-a="wire">Wireframe</button>
+    </div>
+  </div>
+  <div id="status">Cargando…</div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+    import { crear as crearScoop } from '../src/elementos/equipos/scoop.js';
+
+    const statusEl = document.getElementById('status');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x14100c);
+    scene.fog = new THREE.Fog(0x14100c, 14, 46);
+
+    const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 200);
+    camera.position.set(7, 4.2, 8);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.2, 0.3);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.HemisphereLight(0x8899bb, 0x2a1f16, 0.7));
+    const key = new THREE.DirectionalLight(0xfff0dd, 2.6);
+    key.position.set(6, 10, 7); key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8 });
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0x88aaff, 0.6);
+    fill.position.set(-6, 4, -4); scene.add(fill);
+
+    const piso = new THREE.Mesh(new THREE.CircleGeometry(30, 48),
+      new THREE.MeshStandardMaterial({ color: 0x3a332a, roughness: 1 }));
+    piso.rotation.x = -Math.PI / 2; piso.receiveShadow = true; scene.add(piso);
+    const grid = new THREE.GridHelper(30, 30, 0x5a4a30, 0x2e2820);
+    grid.position.y = 0.002; scene.add(grid);
+
+    const scoop = crearScoop();
+    scoop.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(scoop);
+    statusEl.textContent = '✓ Scoop cargado — arrastra para orbitar, rueda para zoom.';
+    statusEl.style.color = '#9fffa0';
+
+    let turn = true, cycle = true, wire = false;
+    document.querySelectorAll('#hud button').forEach(b => b.onclick = () => {
+      b.classList.toggle('on');
+      const a = b.dataset.a;
+      if (a === 'turn') turn = b.classList.contains('on');
+      if (a === 'cycle') cycle = b.classList.contains('on');
+      if (a === 'wire') {
+        wire = b.classList.contains('on');
+        scoop.traverse(o => { if (o.isMesh) o.material.wireframe = wire; });
+      }
+    });
+
+    const clock = new THREE.Clock();
+    let elapsed = 0;
+    function animate() {
+      const dt = clock.getDelta();
+      if (cycle) { elapsed += dt; scoop.userData.tick?.(dt, elapsed); }
+      if (turn) scoop.rotation.y += dt * 0.35;
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

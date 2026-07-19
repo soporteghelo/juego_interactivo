@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Preview — GLB referencia</title>
+  <style>html,body{margin:0;height:100%;background:#cfd6dd;overflow:hidden} #s{position:fixed;bottom:8px;left:8px;font:12px system-ui;color:#123;background:rgba(255,255,255,.6);padding:4px 8px;border-radius:5px}</style>
+</head>
+<body>
+  <div id="s">Cargando GLB…</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+    const params = new URLSearchParams(location.hash.slice(1));
+    const view = params.get('view') || '3q';
+    const s = document.getElementById('s');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1); renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0xcfd6dd);
+    const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 500);
+    const VIEWS = { '3q':[11,6.5,12],'side':[16,4.5,0],'front':[0,4,15],'rear3q':[-11,6.5,-12],'top':[0.1,18,0.1] };
+
+    scene.add(new THREE.HemisphereLight(0xdfe8f2, 0x555049, 1.1));
+    const key = new THREE.DirectionalLight(0xffffff, 2.3); key.position.set(8,13,9); scene.add(key);
+    const fill = new THREE.DirectionalLight(0xbcd0ff, 0.8); fill.position.set(-7,5,-6); scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.9); rim.position.set(-4,6,8); scene.add(rim);
+    const grid = new THREE.GridHelper(30,30,0x77808a,0x8b939c); scene.add(grid);
+
+    new GLTFLoader().load('/models/underground_drilling_machine.glb', (gltf) => {
+      const o = gltf.scene;
+      // Normalizar: escalar a ~10 m de largo, centrar en planta, apoyar en piso.
+      let box = new THREE.Box3().setFromObject(o);
+      const size = box.getSize(new THREE.Vector3());
+      const sc = 10 / Math.max(size.x, size.y, size.z);
+      o.scale.setScalar(sc);
+      box = new THREE.Box3().setFromObject(o);
+      const c = box.getCenter(new THREE.Vector3());
+      o.position.x -= c.x; o.position.z -= c.z; o.position.y -= box.min.y;
+      scene.add(o);
+      const t = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+      camera.position.set(...(VIEWS[view]||VIEWS['3q'])); camera.lookAt(t.x, t.y, t.z);
+      renderer.render(scene, camera);
+      s.textContent = '✓ GLB — view=' + view + '  size(m): ' + [size.x,size.y,size.z].map(v=>(v*sc).toFixed(1)).join(' x ');
+    }, undefined, (e) => { s.textContent = 'ERROR: ' + e; });
+
+    function loop(){ renderer.render(scene, camera); requestAnimationFrame(loop); } loop();
+  </script>
+</body>
+</html>

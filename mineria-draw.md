@@ -1,6 +1,6 @@
 # Skill: Dibujo de Entornos Mineros Subterráneos Realistas
 
-Eres un experto en ilustración técnica y artística de ambientes mineros subterráneos. Cuando el usuario pida dibujar, generar prompts, describir o ilustrar entornos mineros, aplica esta referencia visual detallada derivada de inspecciones reales en la **Unidad Minera Cerro Lindo (NEXA Resources / AESA)**, mina subterránea de roca dura en Perú.
+Eres un experto en ilustración técnica y artística de ambientes mineros subterráneos. Cuando el usuario pida dibujar, generar prompts, describir o ilustrar entornos mineros, aplica esta referencia visual detallada derivada de inspecciones reales en la **unidad minera subterránea (NEXA Resources)**, mina subterránea de roca dura en Perú.
 
 ---
 
@@ -9,8 +9,8 @@ Eres un experto en ilustración técnica y artística de ambientes mineros subte
 | Campo | Valor |
 |---|---|
 | Empresa cliente | NEXA Resources |
-| Unidad minera | Cerro Lindo |
-| Contratista principal | AESA (Andes Excavaciones S.A.) |
+| Unidad minera | Subterránea (genérica) |
+| Contratista principal | contratista minero (genérico) |
 | Tipo | Mina subterránea hard rock (Zn-Pb-Cu) |
 | Nivel referencia | NV-1600 |
 | Área observada | CX.081 / Accesos, cruces y frentes activos |
@@ -84,17 +84,17 @@ Eres un experto en ilustración técnica y artística de ambientes mineros subte
 | Señal | Descripción visual |
 |---|---|
 | **PELIGRO NO INGRESAR** | Fondo rojo `#cc0000`, texto blanco mayúsculas, ~30×20cm, borde blanco. Colgado en cuerda |
-| **ADVERTENCIA (AESA)** | Fondo amarillo brillante `#ffcc00`, logo AESA esquina sup-izq, texto negro mayúsculas grande. Banner flexible ~60×30cm |
+| **ADVERTENCIA** | Fondo amarillo brillante `#ffcc00`, logo SSOMA esquina sup-izq, texto negro mayúsculas grande. Banner flexible ~60×30cm |
 | **PELIGRO CAÍDA** | Fondo rojo, texto blanco, colgado en alambre sobre zona de caída de roca |
 | **VÍA DE ESCAPE** | Fondo verde `#1b5e20`, ícono persona corriendo (blanco), flecha direccional |
 | **USO OBLIGATORIO E.P.P.** | Fondo azul `#0d47a1`, grilla de íconos blancos (casco, lentes, respirador, botas, guantes), ~A4 |
 | **PROHIBIDO BOTAR BASURA** | Fondo blanco, círculo rojo con figura cruzada, texto rojo |
 | **REFUGIO MINERO Nº2** | Banner amarillo `#ffcc00`, logo NEXA + "UNIDAD MINERA CERO LINDO" |
-| **Navegación CX/NV** | Flecha pintada en pared, fondo verde oscuro, texto blanco (ej: CX.081 / NV-1600 / AESA) |
+| **Navegación CX/NV** | Flecha pintada en pared, fondo verde oscuro, texto blanco (ej: CX.081 / NV-1600 / SSOMA) |
 | **Delineadores de tráfico (balizas)** | Poste cilíndrico blanco/gris, bandas reflectivas: rojo-blanco arriba, azul, amarillo, verde abajo. Base de concreto gris. Alto: ~80cm |
 | **Chevrones de dirección** | Fondo blanco o amarillo, flecha ">>" negra o negra sobre amarillo. ~30×30cm, montado en pared |
-| **Monitoreo de gases (pizarra AESA)** | Tablero verde brillante `#1f8a3b` con marco, encabezado blanco "MONITOREO DE GASES" + logo AESA. Cabecera con campos manuscritos en tiza/plumón: NIVEL, LABOR, FECHA, HORA, RESPONSABLE. Tres columnas: **GUARDIA DÍA** / **LMP** / **GUARDIA NOCHE**. Filas por gas: O2 (≈20.6 %, LMP 19.5 %), CO (LMP 25 ppm), CO2 (LMP 5000 ppm), NO2 (LMP 3 ppm), H2S (LMP 10 ppm). Valores escritos a mano en blanco/amarillo |
-| **Tarjeta de bloqueo (lockout tag)** | Funda plástica amarilla `#ffd400` ~12×18cm con cierre, "TARJETA DE BLOQUEO" + logo AESA arriba. Interior: formato manuscrito con TURNO, FECHA, HORA, SUPERVISOR/TRABAJADOR RESPONSABLE, ÁREA, ACTIVIDAD, MOTIVO DEL BLOQUEO, PLAN DE ACCIÓN, RIESGO CRÍTICO. Colgada en candado o cuerda de la barrera |
+| **Monitoreo de gases (pizarra SSOMA)** | Tablero verde brillante `#1f8a3b` con marco, encabezado blanco "MONITOREO DE GASES" + logo SSOMA. Cabecera con campos manuscritos en tiza/plumón: NIVEL, LABOR, FECHA, HORA, RESPONSABLE. Tres columnas: **GUARDIA DÍA** / **LMP** / **GUARDIA NOCHE**. Filas por gas: O2 (≈20.6 %, LMP 19.5 %), CO (LMP 25 ppm), CO2 (LMP 5000 ppm), NO2 (LMP 3 ppm), H2S (LMP 10 ppm). Valores escritos a mano en blanco/amarillo |
+| **Tarjeta de bloqueo (lockout tag)** | Funda plástica amarilla `#ffd400` ~12×18cm con cierre, "TARJETA DE BLOQUEO" + logo SSOMA arriba. Interior: formato manuscrito con TURNO, FECHA, HORA, SUPERVISOR/TRABAJADOR RESPONSABLE, ÁREA, ACTIVIDAD, MOTIVO DEL BLOQUEO, PLAN DE ACCIÓN, RIESGO CRÍTICO. Colgada en candado o cuerda de la barrera |
 | **Plano topográfico / minero (impreso o digital)** | Lámina blanca con red de galerías en líneas naranja `#e88000` (rutas principales) y celeste/verde (secundarias), etiquetas CX/RB/GA + número, recuadro de datos arriba-izquierda (PROG. MENSUAL, NIVEL, LABOR, OB, PRIORIDAD, RUTA CRÍTICA, SECCIÓN, GRADIENTE), zonas marcadas "BLOQUEO", círculos rojos resaltando puntos de interés |
 | **Checklist / pre-uso (formato)** | Hoja A4 plastificada con filas alternadas blanco/rojo, casillas de verificación, sostenida en mano enguantada |
 
@@ -124,7 +124,7 @@ Eres un experto en ilustración técnica y artística de ambientes mineros subte
 
 ### Instalaciones fijas en paredes
 - **Tablero eléctrico naranja:** Caja metálica ~60×80cm, pintura naranja con óxido, breakers Schneider Electric (color verde/negro), cables multicolor saliendo por la base. Siempre sucio, polvoriento.
-- **Tablero de gestión AESA:** Panel verde con borde rojo/blanco, ~80×60cm, bolsillos plásticos con documentos. Secciones: POLÍTICAS / IPERC-MAPA DE RIESGO / ESTÁNDARES / PROCEDIMIENTOS / ESTADÍSTICAS / PLANO TOPOGRÁFICO / PLANO GEOMECÁNICO / GESTIÓN AMBIENTAL / PLAN DE EMERGENCIAS.
+- **Tablero de gestión SSOMA:** Panel verde con borde rojo/blanco, ~80×60cm, bolsillos plásticos con documentos. Secciones: POLÍTICAS / IPERC-MAPA DE RIESGO / ESTÁNDARES / PROCEDIMIENTOS / ESTADÍSTICAS / PLANO TOPOGRÁFICO / PLANO GEOMECÁNICO / GESTIÓN AMBIENTAL / PLAN DE EMERGENCIAS.
 - **Cables en bandejas:** Agrupados en bandeja metálica gris a ~2m de altura, siguiendo el techo de la galería.
 
 ---
@@ -185,7 +185,7 @@ Bloqueo nocturno de labor ciega / zona restringida, muy característico:
 
 ### Escena A: Barrera de ADVERTENCIA
 - Punto de vista a nivel de piso, ligeramente inclinado hacia arriba
-- Banners amarillos "ADVERTENCIA AESA" cruzando el ancho de la galería (~4–5m)
+- Banners amarillos "ADVERTENCIA" cruzando el ancho de la galería (~4–5m)
 - Letreros rojos "PELIGRO NO INGRESAR" sobre los banners en la misma cuerda
 - Trabajador en EPP naranja al otro lado, en silueta por su headlamp (efecto contraluz)
 - Piso completamente reflectivo (agua), refleja los banners amarillos y la luz
@@ -257,7 +257,7 @@ Bloqueo nocturno de labor ciega / zona restringida, muy característico:
 - Opcional: batería de cajas de bloqueo rojas (LEDs verde/rojo) a un lado, tarjeta amarilla colgada
 
 ### Escena I: Tablero de monitoreo de gases
-- Plano frontal del tablero verde "MONITOREO DE GASES" con logo AESA
+- Plano frontal del tablero verde "MONITOREO DE GASES" con logo SSOMA
 - Columnas GUARDIA DÍA / LMP / GUARDIA NOCHE con valores manuscritos
 - Iluminado por headlamp o bombilla cálida, resto en penumbra
 - Pared de roca/shotcrete alrededor, cables colgantes
@@ -276,7 +276,7 @@ Bloqueo nocturno de labor ciega / zona restringida, muy característico:
 
 ### Prompt para escena activa con LED verde
 ```
-Hyper-realistic underground hard rock mine tunnel, Peru, Cerro Lindo zinc mine.
+Hyper-realistic underground hard rock mine tunnel, Peru, underground zinc mine.
 Main access gallery with green neon LED strips outlining the arched tunnel profile.
 White linear LED on ceiling. Wire mesh rock support glowing green.
 Wet muddy floor reflecting green light, central drainage channel.
@@ -288,7 +288,7 @@ Photorealistic, dramatic green ambient light, ISO grain visible, underground atm
 ### Prompt para zona de peligro / barrera
 ```
 Hyper-realistic underground mine danger zone, Peru hard rock mine.
-Yellow ADVERTENCIA warning banners (AESA logo) strung across the 5m-wide tunnel.
+Yellow ADVERTENCIA warning banners (SSOMA logo) strung across the 5m-wide tunnel.
 Red PELIGRO NO INGRESAR signs on rope above the banners.
 One miner silhouetted behind the barrier, only their headlamp visible as a cold white point of light.
 Extremely wet floor, perfect mirror-like reflection of yellow banners in standing water.
@@ -376,8 +376,8 @@ Photorealistic, high ISO grain, claustrophobic underground mood.
 ## DATOS CONTEXTUALES ADICIONALES
 
 - **Empresa cliente:** NEXA Resources (empresa multinacional Zn-Pb-Cu)
-- **Contratista:** AESA (Andes Excavaciones S.A.) — logo triángulo estilizado
-- **Valores AESA en tablero:** INTEGRIDAD · BIENESTAR Y SEGURIDAD · PRODUCTIVIDAD · TRABAJO EN EQUIPO · CLIENTE · PASIÓN Y APRENDIZAJE
+- **Contratista:** contratista minero (genérico) — logo triángulo estilizado
+- **Valores institucionales en tablero:** INTEGRIDAD · BIENESTAR Y SEGURIDAD · PRODUCTIVIDAD · TRABAJO EN EQUIPO · CLIENTE · PASIÓN Y APRENDIZAJE
 - **Sistema de gestión visible en terreno:** IPERC, Plano Geomecánico, Plano Topográfico, Plan de Respuesta a Emergencias
 - **Equipo fotográfico real:** Honor Magic7 Lite (24mm f/1.75, ISO alto ~1000-5000, exposición lenta 1/14s–1/25s) — esto explica el grain y el motion blur en fotos reales
 - **Ambiente térmico real medido:** 31–34 °C, WBGT hasta 34 °C, humedad relativa ~91–92 %, viento ~0 m/s en frentes mal ventilados → ambiente **caluroso, saturado y con neblina/condensación**. Causa típica: manga de ventilación desempalmada que insufla aire caliente al frente.

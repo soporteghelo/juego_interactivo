@@ -71,10 +71,10 @@ async function bootstrap() {
       return;
     }
 
-    // Pantalla completa + horizontal en celular (best-effort).
+    // Pantalla completa en celular (best-effort). Se PERMITE jugar en VERTICAL u horizontal:
+    // ya NO se bloquea la orientación (antes se forzaba landscape).
     if (engine.input.controlScheme === 'touch') {
       try { await document.documentElement.requestFullscreen?.(); } catch { /* ignorado */ }
-      try { await screen.orientation?.lock?.('landscape'); } catch { /* ignorado */ }
     }
 
     engine.begin();

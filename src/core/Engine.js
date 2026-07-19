@@ -24,6 +24,9 @@ import { GridBoundsGuard } from '../player/GridBoundsGuard.js';
 import { DustSystem } from '../particles/Dust.js';
 import { MistSystem } from '../particles/Mist.js';
 import { WorkFX } from '../particles/WorkFX.js';
+import { VentFlowSystem } from '../particles/VentFlowSystem.js';
+import { VaporSystem } from '../particles/VaporSystem.js';
+import { DripSystem } from '../particles/DripSystem.js';
 import { WorkSiteSystem } from '../world/WorkSiteSystem.js';
 import { WorkCrewSystem } from '../world/WorkCrewSystem.js';
 import { AudioManager } from '../audio/AudioManager.js';
@@ -34,9 +37,9 @@ import { TouchControls } from '../ui/TouchControls.js';
 import { VehicleSystem } from '../world/VehicleSystem.js';
 import { DriveController } from '../world/DriveController.js';
 import { HaulCycle } from '../world/HaulCycle.js';
-import { crear as crearScoop } from '../elementos/scoop.js';
+import { crear as crearScoop } from '../elementos/equipos/scoop.js';
 import { NPCManager } from '../ai/NPCManager.js';
-import { precargarMinero } from '../elementos/minero.js';
+import { precargarMinero } from '../elementos/personas/minero.js';
 import { EventDirector } from '../events/EventDirector.js';
 import { MissionManager } from '../missions/MissionManager.js';
 
@@ -67,9 +70,13 @@ export class Engine {
     // la labor: es casi negro y las superficies matte llevan envMapIntensity bajo.
     this.scene.environment = crearEnvMapMina(this.renderer.instance);
 
+    // FOV vertical ADAPTATIVO a la orientacion: en horizontal 75°; en VERTICAL (portrait) sube
+    // a 82° para que el encuadre horizontal no quede "encajonado" (una pantalla alta y estrecha
+    // recorta el campo horizontal). Se re-evalua en cada resize/rotacion (ver _onResize).
+    const _w = window.innerWidth, _h = window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
+      _w >= _h ? 75 : 82,
+      _w / _h,
       0.1,
       Settings.current.drawDistance + 30
     );
@@ -158,6 +165,16 @@ export class Engine {
       world: this.world
     });
 
+    // Colision entre equipos: el vehiculo que conduce el jugador NO puede traspasar la flota
+    // ni el scoop autonomo del acarreo. Provee sus posiciones (excluye el propio conducido).
+    this.drive.setBlockers(() => {
+      const activo = this.drive.active?.mesh;
+      const arr = [];
+      for (const m of this.vehicleSystem.vehicles) if (m !== activo) arr.push(m.position);
+      const hp = this.haul?.vehiclePos; if (hp) arr.push(hp);
+      return arr;
+    });
+
     // Scoop OPERABLE: estacionado cerca del spawn; el jugador se sube con E y lo conduce.
     // En modo retícula el spawn está al sur de la vía principal y el interior queda al NORTE
     // (+Z), así que aparcamos el scoop hacia dentro (+Z) en vez de -Z (que ahí es pared).
@@ -219,9 +236,9 @@ export class Engine {
     this.haul = new HaulCycle({ world: this.world, bus: this.bus });
 
     // Camiones cargados/vacios: puntos de carga (acceso a la camara, c0_r2) y descarga
-    // (echadero, c2_r3) sobre el circuito de la RN 96.
+    // (echadero, c2_r5, perimetro sur) sobre el circuito de la RN 96.
     const nodo = (id) => this.world.segments.find(s => s.nodeId === id);
-    const carga = nodo('c0_r2'), descarga = nodo('c2_r3');
+    const carga = nodo('c0_r2'), descarga = nodo('c2_r5');
     if (carga && descarga) this.vehicleSystem.setCargoPoints(carga.group.position, descarga.group.position);
 
     // Los NPC se refugian ante el equipo que CONDUCE el jugador Y ante el scoop autonomo del
@@ -256,6 +273,12 @@ export class Engine {
     // Cuadrillas HUMANAS en las labores activas (perforista, sostenimiento, boquillero, vigia):
     // se crean/retiran por proximidad. Complementa a workSites (que anima solo las maquinas).
     this.workCrews = new WorkCrewSystem({ world: this.world, bus: this.bus, scene: this.scene });
+    // Flujo de ventilacion VISIBLE: penacho de aire en la boca de la manga mas cercana.
+    this.ventFlow = new VentFlowSystem({ scene: this.scene, world: this.world, settings: Settings, bus: this.bus });
+    // Vaho/condensacion en las labores calurosas (frente/shotcrete/bombeo).
+    this.vapor = new VaporSystem({ scene: this.scene, world: this.world, settings: Settings, bus: this.bus });
+    // Goteo VISIBLE de agua desde la boveda (rizo al impactar) sincronizado con el ploc del audio.
+    this.drips = new DripSystem({ scene: this.scene, settings: Settings, bus: this.bus, audio: this.audio });
 
     await tick();
     onStatus('Preparando interfaz…');
@@ -302,6 +325,9 @@ export class Engine {
     this.loop.add(this.workSites);   // elige emisores de labor por distancia
     this.loop.add(this.workCrews);   // cuadrillas humanas en las labores (spawn por proximidad)
     this.loop.add(this.workFX);      // integra las particulas de las labores
+    this.loop.add(this.ventFlow);    // penacho de aire en la boca de la manga mas cercana
+    this.loop.add(this.vapor);       // vaho/condensacion en las labores calurosas
+    this.loop.add(this.drips);       // goteo visible desde la boveda (dispara el ploc del audio)
     this.loop.add(this.audio);
     this.loop.add(this.hud);
     this.loop.add(this.minimap);
@@ -359,6 +385,7 @@ export class Engine {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.camera.aspect = w / h;
+    this.camera.fov = w >= h ? 75 : 82;   // portrait: FOV vertical mayor (mejor encuadre horizontal)
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.postfx?.setSize(w, h);

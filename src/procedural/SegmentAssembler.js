@@ -8,6 +8,7 @@ import { RefugeSegment } from '../world/segments/RefugeSegment.js';
 import { CrossroadSegment } from '../world/segments/CrossroadSegment.js';
 import { PropScatter } from './PropScatter.js';
 import { buildSegmentColliders } from '../physics/Colliders.js';
+import { registerPropSolids } from '../physics/PropSolids.js';
 
 /** Mapa tipo -> clase de tramo. Agregar aqui nuevos tipos de entorno (extension point). */
 const SEGMENT_CLASSES = {
@@ -75,6 +76,8 @@ export class SegmentAssembler {
 
       // Colisionadores estaticos en coordenadas de mundo.
       seg.physicsColliders = buildSegmentColliders(this.physics, seg, cursor);
+      // Props SOLIDOS (refugio, mobiliario): el jugador/NPC ya no los atraviesan.
+      registerPropSolids(this.physics, seg);
 
       // Recolecta interactuables y peligros (los objetos ya estan en el grafo de escena).
       for (const it of seg.interactables) interactables.push(it);

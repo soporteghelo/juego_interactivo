@@ -11,7 +11,10 @@ import { MineMaterials, PALETTE } from '../world/materials/MineMaterials.js';
  *
  * @returns {THREE.Group}
  */
-export function createLedStrip({ width, height, length, lighting, archRatio = 0.4 }) {
+export function createLedStrip({
+  width, height, length, lighting, archRatio = 0.4,
+  arcSpacing = 4, radialSegments = 6, tubularSegments = 24, lampEvery = 1
+}) {
   const group = new THREE.Group();
   const halfW = width / 2;
   const wallTop = height * (1 - archRatio);
@@ -32,20 +35,20 @@ export function createLedStrip({ width, height, length, lighting, archRatio = 0.
 
   const curve = new THREE.CatmullRomCurve3(profilePoints);
 
-  // Coloca varios arcos a lo largo del tramo (cada ~4m).
-  const arcSpacing = 4;
+  // Coloca varios arcos a lo largo del tramo (por defecto cada ~4m; el modo retICula sube el
+  // espaciado y baja los segmentos del tubo para aligerar decenas de galerias).
   const count = Math.max(1, Math.round(length / arcSpacing));
   for (let i = 0; i <= count; i++) {
     const z = -(length * i) / count;
     const tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 24, 0.06, 6, false),
+      new THREE.TubeGeometry(curve, tubularSegments, 0.06, radialSegments, false),
       mat
     );
     tube.position.z = z;
     group.add(tube);
 
-    // Luz real verde solo si hay presupuesto (banar la galeria de verde).
-    if (lighting?.canAddLight()) {
+    // Luz real verde solo si hay presupuesto (banar la galeria de verde), 1 de cada `lampEvery`.
+    if (i % lampEvery === 0 && lighting?.canAddLight()) {
       const light = new THREE.PointLight(PALETTE.ledVerde, 32, 18, 2);
       light.position.set(0, wallTop, z);
       group.add(light);

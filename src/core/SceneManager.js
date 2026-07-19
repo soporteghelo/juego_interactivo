@@ -16,14 +16,20 @@ export class SceneManager {
     this.scene.background = black;
 
     // Niebla lineal: controla a que distancia se traga el fondo. Valores del preset.
+    // Tinte MUY oscuro y cálido (no negro puro): simula el polvo/particulado en suspension de
+    // una galeria real, dando profundidad atmosferica sin coste. El fondo sigue en negro.
     this.scene.fog = new THREE.Fog(
-      0x000000,
+      0x070605,
       Settings.current.fogNear,
       Settings.current.fogFar
     );
 
-    // Luz ambiental (luminarias generales de la mina): piso de visibilidad. Duplicada.
-    this._ambientBase = 1.15;
+    // Luz ambiental (luminarias generales de la mina): piso de visibilidad MINIMO.
+    // Bajada (1.15 → 0.65) para restaurar el claroscuro del md ("no hay luz ambiental
+    // difusa; contraste brutal"): los negros vuelven a ser profundos y los emisivos/charcos
+    // resaltan. El headlamp y las luminarias puntuales llevan el peso de la navegacion.
+    // Sigue atada al slider de brillo (onBrightness) por si el jugador necesita mas luz.
+    this._ambientBase = 0.65;
     this.ambient = new THREE.AmbientLight(0x8390a0, this._ambientBase);
     this.scene.add(this.ambient);
 
@@ -31,7 +37,8 @@ export class SceneManager {
     // apuntando hacia abajo, asi que recibe el color de SUELO (ground) de esta luz. Por eso
     // el ground se sube a un tono terroso claro (0x6a6252) para que la CORONA (techo de la
     // labor) se vea con su textura terrosa al mirar arriba, en vez de perderse en negro.
-    this._hemiBase = 1.3;
+    // Bajada (1.3 → 0.85) junto con la ambiental: mismo motivo (claroscuro del md).
+    this._hemiBase = 0.85;
     this.hemi = new THREE.HemisphereLight(0xa8b6c8, 0x6a6252, this._hemiBase);
     this.scene.add(this.hemi);
 

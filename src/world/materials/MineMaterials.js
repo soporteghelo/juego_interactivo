@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {
   texturaRoca, texturaShotcrete, texturaBarro, texturaLodo, texturaMetal, texturaGrunge,
-  texturaRocaTunel, texturaRocaTunelNormal, texturaRocaTunelRough
+  texturaRocaTunel, texturaRocaTunelNormal, texturaRocaTunelRough, texturaAguaNormal,
+  texturaOxidoEscurrido
 } from './Texturas.js';
 
 /**
@@ -152,6 +153,32 @@ class MaterialLibrary {
     );
   }
 
+  /**
+   * BARRO/POLVO DE LOS BAJOS de la flota (md: "muy polvoriento", nada "de fabrica" limpio).
+   * Material UNICO compartido por todos los equipos: salpicadura seca y mate en faldones, ejes
+   * y parte baja del chasis. Mate total (no compite con vastagos cromados ni filos pulidos).
+   */
+  barroBajos() {
+    return this._get('barroBajos', () =>
+      new THREE.MeshStandardMaterial({ color: 0x4a3a26, roughness: 0.98, metalness: 0.0 })
+    );
+  }
+
+  /**
+   * ACERO PULIDO POR ABRASION — el FILO de faena de los implementos (dientes/labio de cuchara,
+   * pica del scaler, cuchillas/labios). La roca come la pintura y pule el metal: espeja
+   * (roughness muy bajo, metalness alto) contra el resto polvoriento del equipo. Material UNICO
+   * compartido por toda la flota (md: "filo de cuchara/hoja/pica en metal PULIDO... brillante").
+   * Es acero de trabajo, no cromo: brillo alto pero no espejo perfecto.
+   */
+  aceroPulido() {
+    return this._get('aceroPulido', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0xd0d4d8, roughness: 0.16, metalness: 0.95, envMapIntensity: 0.8
+      })
+    );
+  }
+
   /** Lodo / barro espeso: marron oscuro, humedo pero mate. */
   lodo() {
     return this._get('lodo', () =>
@@ -162,6 +189,28 @@ class MaterialLibrary {
         metalness: 0.05,
         clearcoat: 0.17,
         clearcoatRoughness: 0.55
+      })
+    );
+  }
+
+  /**
+   * Agua CORRIENDO (canal de drenaje central + soleras de cuneta): mismo look que el charco
+   * pero con normal map de rizos que BaseSegment desplaza cada frame (userData.tick) → el
+   * flujo hacia la poza de bombeo se VE. md: "canal central de drenaje con agua".
+   * La textura es compartida: UN offset anima el agua de toda la mina (coste ~cero).
+   */
+  aguaCorriente() {
+    return this._get('aguaCorriente', () =>
+      new THREE.MeshPhysicalMaterial({
+        color: 0x05060a,
+        normalMap: texturaAguaNormal(),
+        normalScale: new THREE.Vector2(0.35, 0.35),   // rizo sutil: lamina fina, no oleaje
+        roughness: 0.14,
+        metalness: 0.0,
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.08,
+        reflectivity: 0.45,
+        envMapIntensity: 0.9
       })
     );
   }
@@ -187,6 +236,18 @@ class MaterialLibrary {
   acero() {
     return this._get('acero', () =>
       new THREE.MeshStandardMaterial({ color: PALETTE.acero, map: texturaMetal(), roughness: 0.65, metalness: 0.28, envMapIntensity: 0.4 })
+    );
+  }
+
+  /**
+   * Acero estructural OXIDADO (bandejas de cable, marcos, anillos): acero sucio con parches y
+   * VETAS de oxido escurrido (md: oxido cafe en bordes/soldaduras; la mina humeda lo lava hacia
+   * abajo). Compartido/cacheado, sin geometria extra. NO usar en la pintura de equipos (va limpia);
+   * solo estructura de acero fija y expuesta a la humedad.
+   */
+  aceroOxidado() {
+    return this._get('aceroOxidado', () =>
+      new THREE.MeshStandardMaterial({ color: 0x9a8f82, map: texturaOxidoEscurrido(), roughness: 0.86, metalness: 0.22, envMapIntensity: 0.3 })
     );
   }
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Device } from '../core/Device.js';
 
 /**
  * Niebla baja / neblina a ras de piso (md: halo difuso en neblina, ambiente humedo).
@@ -6,13 +7,17 @@ import * as THREE from 'three';
  * Complementa a la niebla de escena (SceneManager) con unas pocas capas planas
  * semitransparentes a baja altura que se mueven suavemente y siguen a la camara. Es muy
  * barato (3-4 planos) y aporta volumen a los haces de luz. Se desactiva en calidad baja.
+ *
+ * OJO fill-rate: son 4 planos aditivos de 30x30 con depthWrite:false que siguen a la camara,
+ * es decir ~4x overdraw de PANTALLA COMPLETA cada frame. Barato en escritorio, pero uno de los
+ * mayores costes en GPU movil (tile-based), asi que se DESACTIVA en dispositivos tactiles.
  */
 export class MistSystem {
   constructor({ scene, settings }) {
     this.scene = scene;
     this.settings = settings;
     this.group = new THREE.Group();
-    this.enabled = settings.current.particleDensity > 0.25;
+    this.enabled = settings.current.particleDensity > 0.25 && !Device.isTouch;
 
     const tex = this._softTexture();
     const mat = new THREE.MeshBasicMaterial({

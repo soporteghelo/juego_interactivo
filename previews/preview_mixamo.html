@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview — Minero Mixamo (módulo minero.js del juego)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #14100c; overflow: hidden; font-family: system-ui, sans-serif; }
+    #hud { position: fixed; top: 12px; left: 12px; z-index: 10; color: #ffd9a0;
+           background: rgba(0,0,0,.5); padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+    #hud b { color: #fff; }
+    #hud button { background:#2a2016; color:#ffd9a0; border:1px solid #6b4f2a; border-radius:6px;
+                  padding:4px 10px; margin-right:6px; cursor:pointer; font-size:12px; }
+    #hud button.on { background:#7a5a2a; color:#fff; }
+    #status { position:fixed; bottom:12px; left:12px; z-index:10; color:#9fd0ff;
+              background:rgba(0,0,0,.5); padding:6px 10px; border-radius:6px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div><b>Minero Mixamo</b> — usa el módulo <code>src/elementos/personas/minero.js</code> del juego</div>
+    <div style="margin-top:6px">
+      Rol:
+      <button data-rol="operador" class="on">Operador</button>
+      <button data-rol="supervisor">Supervisor</button>
+      <button data-rol="geomecanica">Geomecánica</button>
+    </div>
+    <div style="margin-top:6px">
+      Estado: <button data-st="idle">Idle</button><button data-st="walk" class="on">Caminar</button><button data-st="run">Correr</button>
+    </div>
+  </div>
+  <div id="status">Cargando…</div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+    import { precargarMinero, crear as crearMinero, actualizar as actualizarMinero, mineroDisponible } from '../src/elementos/personas/minero.js';
+
+    const statusEl = document.getElementById('status');
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x14100c);
+    scene.fog = new THREE.Fog(0x14100c, 8, 30);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 200);
+    camera.position.set(2.4, 1.7, 3.2);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.0, 0);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.HemisphereLight(0x8899bb, 0x2a1f16, 0.6));
+    const key = new THREE.DirectionalLight(0xfff0dd, 2.4);
+    key.position.set(4, 8, 5); key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 });
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0x88aaff, 0.6);
+    fill.position.set(-4, 3, -3); scene.add(fill);
+
+    const piso = new THREE.Mesh(new THREE.CircleGeometry(20, 48),
+      new THREE.MeshStandardMaterial({ color: 0x3a332a, roughness: 1 }));
+    piso.rotation.x = -Math.PI / 2; piso.receiveShadow = true; scene.add(piso);
+    const grid = new THREE.GridHelper(20, 20, 0x5a4a30, 0x2e2820);
+    grid.position.y = 0.002; scene.add(grid);
+
+    let minero = null, rol = 'operador', estado = 'walk';
+
+    function montar(nuevoRol) {
+      if (minero) { scene.remove(minero); }
+      rol = nuevoRol;
+      minero = crearMinero({ rol });
+      minero.rotation.y = Math.PI;   // mirando a la cámara
+      scene.add(minero);
+      // Forzar un primer estado
+      minero.userData.anim?.setEstado(estado);
+    }
+
+    (async () => {
+      statusEl.textContent = 'Cargando FBX (running.fbx + walk.fbx)…';
+      await precargarMinero();
+      if (!mineroDisponible()) {
+        statusEl.textContent = '✗ No se pudo cargar el FBX — se muestra la persona procedural (fallback).';
+        statusEl.style.color = '#ffb060';
+      } else {
+        statusEl.textContent = '✓ Minero FBX cargado (caminar / correr / idle + EPP en huesos).';
+        statusEl.style.color = '#9fffa0';
+      }
+      montar('operador');
+    })();
+
+    // UI
+    document.querySelectorAll('#hud [data-rol]').forEach(b => b.onclick = () => {
+      document.querySelectorAll('#hud [data-rol]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on'); montar(b.dataset.rol);
+    });
+    document.querySelectorAll('#hud [data-st]').forEach(b => b.onclick = () => {
+      document.querySelectorAll('#hud [data-st]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on'); estado = b.dataset.st;
+      minero?.userData.anim?.setEstado(estado);
+    });
+
+    // Loop: mapeamos el estado a los flags moviendo/corriendo de actualizar()
+    const clock = new THREE.Clock();
+    function animate() {
+      const dt = clock.getDelta();
+      if (minero) {
+        const moviendo = estado !== 'idle';
+        const corriendo = estado === 'run';
+        actualizarMinero(minero, dt, moviendo, corriendo);
+      }
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

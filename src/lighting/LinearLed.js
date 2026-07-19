@@ -8,7 +8,7 @@ import { MineMaterials } from '../world/materials/MineMaterials.js';
  *
  * @returns {THREE.Group}
  */
-export function createLinearLed({ height, length, lighting, archRatio = 0.4 }) {
+export function createLinearLed({ height, length, lighting, archRatio = 0.4, lampSpacing = 6 }) {
   const group = new THREE.Group();
   const y = height - 0.1; // justo bajo la clave del arco
 
@@ -20,7 +20,7 @@ export function createLinearLed({ height, length, lighting, archRatio = 0.4 }) {
   group.add(bar);
 
   // Luces reales blancas frias repartidas (sombras duras, luz dirigida hacia abajo).
-  const lampSpacing = 6;
+  // `lampSpacing` mayor = menos luces (el modo retICula lo sube para aligerar).
   const count = Math.max(1, Math.round(length / lampSpacing));
   for (let i = 0; i < count; i++) {
     if (!lighting?.canAddLight()) break;

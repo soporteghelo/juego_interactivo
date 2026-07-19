@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CATALOGO } from '../elementos/index.js';
+import { recolectarSubelementos } from '../elementos/_comun/subelemento.js';
 import { disposeObject } from '../utils/Disposable.js';
+import { precargarMinero, actualizar as actualizarMinero } from '../elementos/personas/minero.js';
 
 /**
  * VISUALIZADOR DE ELEMENTOS.
@@ -9,6 +11,15 @@ import { disposeObject } from '../utils/Disposable.js';
  * Renderiza cada elemento de la mina de forma aislada: rota, mide su tamaño,
  * permite wireframe y grilla. Funciona en escritorio (ratón) y en celular
  * (OrbitControls touch: 1 dedo = rotar, 2 dedos = zoom/pan).
+ *
+ * DISCRETIZACIÓN: los elementos complejos exponen SUBELEMENTOS (grupos con
+ * userData.subelemento). Al seleccionar el elemento, sus subelementos se
+ * listan debajo en el panel; al hacer clic en uno, se AÍSLA (solo esa parte
+ * queda visible) y la cámara lo encuadra para inspección/edición.
+ *
+ * PERSISTENCIA: la selección (elemento + subelemento) se guarda en
+ * localStorage; al recargar la página (p. ej. por un cambio de código con
+ * Vite) se restaura la misma vista en lugar de volver al primer objeto.
  */
 
 const holder = document.getElementById('canvas-holder');
@@ -78,6 +89,22 @@ let actual   = null;   // Object3D del elemento actualmente visible
 const animados = [];   // funciones tick recogidas del elemento
 let autoRotar = true;
 let wireframe = false;
+let subGrupos = [];    // subelementos (grupos etiquetados) del elemento actual
+let subSel    = null;  // subelemento aislado actualmente (null = elemento completo)
+
+// ── Persistencia de la selección (sobrevive recargas / HMR de Vite) ──────
+const LS_KEY = 'visor.seleccion';
+function guardarSeleccion() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      id:  actual?.userData?.__id ?? null,
+      sub: subSel?.userData?.subelemento?.id ?? null
+    }));
+  } catch { /* almacenamiento no disponible: se ignora */ }
+}
+function leerSeleccion() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch { return null; }
+}
 
 // ── Lista lateral ─────────────────────────────────────────────────────────
 const lista  = document.getElementById('lista');
@@ -88,12 +115,31 @@ function pintarLista(filtro = '') {
   const f = filtro.trim().toLowerCase();
   CATALOGO.forEach((el, i) => {
     if (f && !(`${el.nombre} ${el.id}`.toLowerCase().includes(f))) return;
+    const esActivo = actual?.userData?.__id === el.id;
     const div = document.createElement('div');
-    div.className = 'item' + (actual?.userData?.__id === el.id ? ' activo' : '');
+    div.className = 'item' + (esActivo ? ' activo' : '');
     div.textContent = el.nombre;
     div.dataset.index = i;
     div.addEventListener('click', () => mostrar(i));
     lista.appendChild(div);
+
+    // ── Subelementos del elemento activo (discretización) ────────────
+    if (esActivo && subGrupos.length) {
+      const completo = document.createElement('div');
+      completo.className = 'subitem' + (!subSel ? ' activo' : '');
+      completo.textContent = '⬒ Elemento completo';
+      completo.addEventListener('click', () => seleccionarSub(null));
+      lista.appendChild(completo);
+      for (const sg of subGrupos) {
+        const metaSub = sg.userData.subelemento;
+        const sdiv = document.createElement('div');
+        sdiv.className = 'subitem' + (subSel === sg ? ' activo' : '');
+        sdiv.textContent = metaSub.nombre;
+        sdiv.title = metaSub.descripcion || '';
+        sdiv.addEventListener('click', () => seleccionarSub(metaSub.id));
+        lista.appendChild(sdiv);
+      }
+    }
   });
 }
 
@@ -104,32 +150,82 @@ function mostrar(index) {
   const el = CATALOGO[index];
   if (!el) return;
 
-  if (actual) { disposeObject(actual); actual = null; }
+  if (actual) {
+    // El minero FBX comparte geometría/materiales entre clones (SkeletonUtils.clone):
+    // NO se debe disposear o romperíamos los siguientes clones. Solo se quita de la escena.
+    if (actual.userData?.anim) actual.parent?.remove(actual);
+    else disposeObject(actual);
+    actual = null;
+  }
   animados.length = 0;
+  subGrupos = [];
+  subSel = null;
 
   const obj = el.crear();
   obj.userData.__id = el.id;
+  obj.userData.__meta = el;
   scene.add(obj);
   actual = obj;
 
   // Recolecta animaciones (userData.tick) del elemento y sus hijos
   obj.traverse((c) => { if (c.userData?.tick) animados.push(c.userData.tick); });
 
+  // Subelementos etiquetados de primer nivel (discretización)
+  subGrupos = recolectarSubelementos(obj);
+
   aplicarWireframe();
 
-  // Bounding box: tamaño, centro y distancia de encuadre
-  const box    = new THREE.Box3().setFromObject(obj);
+  // Reiniciar rotacion acumulada para que el objeto arranque siempre de frente
+  actual.rotation.y = 0;
+  actual.updateMatrixWorld(true);
+
+  encuadrar(actual);
+  actualizarInfo();
+  guardarSeleccion();
+  pintarLista(search.value);
+}
+
+/**
+ * Aísla un subelemento del elemento actual: solo esa parte queda visible y
+ * la cámara la encuadra. `null` restaura el elemento completo.
+ * @param {string|null} idSub
+ */
+function seleccionarSub(idSub) {
+  if (!actual) return;
+  subSel = idSub
+    ? subGrupos.find((s) => s.userData.subelemento.id === idSub) || null
+    : null;
+
+  aislar(actual, subSel);
+
+  // El subelemento aislado se muestra estático (sin autorrotación) y de
+  // frente, para poder medirlo/inspeccionarlo con precisión.
+  actual.rotation.y = 0;
+  actual.updateMatrixWorld(true);
+
+  encuadrar(subSel || actual);
+  actualizarInfo();
+  guardarSeleccion();
+  pintarLista(search.value);
+}
+
+/** Muestra solo `sel` (y sus ancestros). Con sel=null todo vuelve a ser visible. */
+function aislar(root, sel) {
+  if (!sel) { root.traverse((o) => { o.visible = true; }); return; }
+  root.traverse((o) => { o.visible = false; });
+  sel.traverse((o) => { o.visible = true; });
+  for (let p = sel; p && p !== root; p = p.parent) p.visible = true;
+  root.visible = true;
+}
+
+/** Encuadra la cámara proporcional al bounding box del objeto dado. */
+function encuadrar(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  if (box.isEmpty()) return;
   const size   = new THREE.Vector3();
   const center = new THREE.Vector3();
   box.getSize(size);
   box.getCenter(center);
-
-  document.getElementById('nombre').textContent = el.nombre;
-  document.getElementById('desc').textContent   = el.descripcion || '';
-  document.getElementById('dims').textContent   =
-    `Dimensiones: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m  ·  id: ${el.id}`;
-
-  // Encuadra la cámara proporcional al tamaño del objeto
   const radio = Math.max(size.length() * 0.65, 0.5);
   controls.target.copy(center);
   camera.position.copy(center).add(
@@ -139,11 +235,31 @@ function mostrar(index) {
   camera.far  = radio * 120;
   camera.updateProjectionMatrix();
   controls.update();
+}
 
-  // Reiniciar rotacion acumulada para que el objeto arranque siempre de frente
-  actual.rotation.y = 0;
+/** Refresca nombre/descripcion/dimensiones según elemento o subelemento activo. */
+function actualizarInfo() {
+  const el = actual?.userData?.__meta;
+  if (!el) return;
+  const objetivo = subSel || actual;
+  const box  = new THREE.Box3().setFromObject(objetivo);
+  const size = new THREE.Vector3();
+  if (!box.isEmpty()) box.getSize(size);
+  const dims = `${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m`;
 
-  pintarLista(search.value);
+  if (subSel) {
+    const metaSub = subSel.userData.subelemento;
+    document.getElementById('nombre').textContent = `${el.nombre} — ${metaSub.nombre}`;
+    document.getElementById('desc').textContent   = metaSub.descripcion || '';
+    document.getElementById('dims').textContent   =
+      `Dimensiones: ${dims}  ·  subelemento: ${metaSub.id}  ·  id: ${el.id}`;
+  } else {
+    const nSubs = subGrupos.length ? `  ·  ${subGrupos.length} subelementos` : '';
+    document.getElementById('nombre').textContent = el.nombre;
+    document.getElementById('desc').textContent   = el.descripcion || '';
+    document.getElementById('dims').textContent   =
+      `Dimensiones: ${dims}  ·  id: ${el.id}${nSubs}`;
+  }
 }
 
 function aplicarWireframe() {
@@ -193,9 +309,14 @@ function animar() {
   const t  = clock.elapsedTime;
 
   // Auto-rotacion: se pausa mientras el usuario interactua con el objeto
-  if (autoRotar && actual && !interactuando) {
+  // o mientras hay un SUBELEMENTO aislado (inspección estática).
+  if (autoRotar && actual && !interactuando && !subSel) {
     actual.rotation.y += dt * 0.45;
   }
+
+  // Minero FBX: avanza su animación de esqueleto (camina en el sitio) + EPP en huesos.
+  // Velocidad nominal de marcha → cadencia natural (timeScale≈1) en la vista del visor.
+  if (actual?.userData?.anim) actualizarMinero(actual, dt, true, false, 1.15);
 
   animados.forEach((fn) => fn(dt, t));
   controls.update();
@@ -203,6 +324,21 @@ function animar() {
 }
 
 // ── Arranque ─────────────────────────────────────────────────────────────
+// Restaura la última selección guardada: si estabas viendo el refugio y el
+// código cambió (recarga de Vite), sigues viendo el refugio (y el mismo
+// subelemento). Si no hay selección guardada, arranca en el primer elemento.
+const guardada = leerSeleccion();
+const idxIni = guardada?.id ? CATALOGO.findIndex((e) => e.id === guardada.id) : -1;
 pintarLista();
-mostrar(0);
+mostrar(idxIni >= 0 ? idxIni : 0);
+if (idxIni >= 0 && guardada?.sub) seleccionarSub(guardada.sub);
 animar();
+
+// Carga el FBX del minero en segundo plano. Si el elemento visible es un minero que
+// se mostró como fallback procedural, lo recarga ya con el modelo FBX real.
+precargarMinero().then(() => {
+  if (actual?.userData?.__id?.startsWith('minero_')) {
+    const i = CATALOGO.findIndex((e) => e.id === actual.userData.__id);
+    if (i >= 0) mostrar(i);
+  }
+});

@@ -11,7 +11,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#15181d" />
-  <title>Visualizador de Elementos — Mina Cerro Lindo</title>
+  <title>Visualizador de Elementos — Mina Subterránea</title>
   <style>
     /* ── Reset y base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -74,6 +74,18 @@
     }
     .item:hover  { background: #232a32; }
     .item.activo { background: #232a32; border-left-color: #39ff14; color: #39ff14; }
+
+    /* ── Subelementos (partes de un elemento complejo) ── */
+    .subitem {
+      padding: 7px 16px 7px 34px; cursor: pointer;
+      border-left: 3px solid #2c333c;
+      font-size: 0.8rem; color: #9fb0c0;
+      background: #171c22;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.1s;
+    }
+    .subitem:hover  { background: #232a32; color: #cfe0ee; }
+    .subitem.activo { background: #232a32; border-left-color: #ffcc00; color: #ffcc00; }
 
     #panel-footer {
       padding: 10px 16px; border-top: 1px solid #2c333c; font-size: 0.8rem;
@@ -187,7 +199,8 @@
 
       /* Search y lista mas grandes (touch targets) */
       #search { font-size: 1rem; padding: 11px 12px; }
-      .item   { font-size: 0.94rem; padding: 13px 16px; }
+      .item    { font-size: 0.94rem; padding: 13px 16px; }
+      .subitem { font-size: 0.88rem; padding: 11px 16px 11px 34px; }
 
       /* Info: mas compacta, respeta notch inferior */
       #info {

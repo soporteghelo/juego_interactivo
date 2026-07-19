@@ -147,6 +147,57 @@ export const texturaRocaTunelRough = () => {
   return tex;
 };
 
+/**
+ * NORMAL MAP de AGUA CORRIENDO (canal de drenaje y cunetas): rizos suaves ALARGADOS en el
+ * sentido del flujo (eje V = a lo largo del tunel). El material la desplaza (offset.y) cada
+ * frame → el agua "corre" hacia la poza de bombeo, como pide el md ("canal central de
+ * drenaje con agua"). 128px basta: el agua es una lamina angosta y el rizo es suave.
+ * colorSpace LINEAL (NoColorSpace), como todo normal map. Cacheada y COMPARTIDA: un solo
+ * offset anima el agua de TODA la mina.
+ */
+export const texturaAguaNormal = () => {
+  if (_cache.has('aguaN')) return _cache.get('aguaN');
+  const size = 128;
+  // 1) Campo de altura: ondas alargadas en V (flujo) + rizo fino transversal
+  const { ctx: h } = lienzo(size);
+  h.fillStyle = '#808080'; h.fillRect(0, 0, size, size);
+  for (let i = 0; i < 46; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const g = Math.random() < 0.5 ? 60 : 200;      // valle o cresta
+    h.fillStyle = `rgba(${g},${g},${g},${0.10 + Math.random() * 0.16})`;
+    h.beginPath();
+    // Elipses MUY alargadas en Y (el flujo estira el rizo a lo largo del canal)
+    h.ellipse(x, y, 2 + Math.random() * 5, 14 + Math.random() * 30, 0, 0, Math.PI * 2);
+    h.fill();
+  }
+  const src = h.getImageData(0, 0, size, size).data;
+  // 2) Normales por gradiente central (mismo metodo que texturaRocaTunelNormal)
+  const { c: nc, ctx: nctx } = lienzo(size);
+  const dst = nctx.createImageData(size, size);
+  const H = (x, y) => src[(((y + size) % size) * size + ((x + size) % size)) * 4] / 255;
+  const strength = 1.4;   // rizo suave: el agua no es roca
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = H(x + 1, y) - H(x - 1, y);
+      const dy = H(x, y + 1) - H(x, y - 1);
+      let nx = -dx * strength, ny = -dy * strength, nz = 1;
+      const len = Math.hypot(nx, ny, nz) || 1; nx /= len; ny /= len; nz /= len;
+      const i = (y * size + x) * 4;
+      dst.data[i] = (nx * 0.5 + 0.5) * 255;
+      dst.data[i + 1] = (ny * 0.5 + 0.5) * 255;
+      dst.data[i + 2] = (nz * 0.5 + 0.5) * 255;
+      dst.data[i + 3] = 255;
+    }
+  }
+  nctx.putImageData(dst, 0, 0);
+  const tex = new THREE.CanvasTexture(nc);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 2;
+  tex.colorSpace = THREE.NoColorSpace;
+  _cache.set('aguaN', tex);
+  return tex;
+};
+
 /** Shotcrete: spray rugoso gris claro con motas. */
 export const texturaShotcrete = () => crearTextura('shotcrete', (ctx, s) => {
   ctx.fillStyle = '#c8c8c0'; ctx.fillRect(0, 0, s, s);
@@ -188,6 +239,26 @@ export const texturaOxido = () => crearTextura('oxido', (ctx, s) => {
   ctx.fillStyle = '#a0522d'; ctx.fillRect(0, 0, s, s);
   manchas(ctx, s, 220, () => `rgba(${120 + Math.random() * 50 | 0},${60 + Math.random() * 40 | 0},${20 + Math.random() * 30 | 0},0.5)`, 2, 12);
 }, { repeat: [3, 3] });
+
+/**
+ * Acero estructural OXIDADO con ESCURRIMIENTO: base de acero sucio con parches de oxido y VETAS
+ * verticales que "chorrean" hacia abajo — el agua de filtracion (mina a >90% HR) lava el oxido de
+ * bordes/soldaduras/pernos. Base clara (tiñe sin aplanar el color del material, como el resto de
+ * mapas de metal). Para bandejas, marcos y anillos de acero fijo; NO para la pintura de equipos.
+ */
+export const texturaOxidoEscurrido = () => crearTextura('oxidoEscurrido', (ctx, s) => {
+  ctx.fillStyle = '#b9b2a6'; ctx.fillRect(0, 0, s, s);                          // acero sucio (claro)
+  manchas(ctx, s, 90, () => `rgba(${150 + Math.random() * 40 | 0},${80 + Math.random() * 35 | 0},${40 + Math.random() * 25 | 0},0.5)`, 3, 16); // parches de oxido
+  for (let i = 0; i < 26; i++) {                                                // vetas de escurrimiento
+    const x = Math.random() * s, y0 = Math.random() * s * 0.5;
+    const len = s * (0.25 + Math.random() * 0.55);
+    const grad = ctx.createLinearGradient(x, y0, x, y0 + len);
+    grad.addColorStop(0, `rgba(120,${55 + Math.random() * 25 | 0},25,0.5)`);
+    grad.addColorStop(1, 'rgba(120,60,25,0)');
+    ctx.strokeStyle = grad; ctx.lineWidth = 1 + Math.random() * 3;
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x + (Math.random() - 0.5) * 4, y0 + len); ctx.stroke();
+  }
+}, { repeat: [2, 2] });
 
 /** Goma de neumatico (negro con surcos). */
 export const texturaGoma = () => crearTextura('goma', (ctx, s) => {

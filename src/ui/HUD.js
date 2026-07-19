@@ -114,12 +114,16 @@ export class HUD {
     this.root.appendChild(this.mission);
     this._missionObjs = new Map(); // id → {el, done}
 
-    // Aviso de rotacion (celular)
+    // Aviso NO bloqueante (celular): el juego funciona en vertical U horizontal. Se muestra
+    // como un pequeño toast que se auto-oculta — ya NO tapa la pantalla en vertical.
     this.orient = document.createElement('div');
     this.orient.className = 'orientation-hint';
-    this.orient.textContent = 'Gira el dispositivo a horizontal para una mejor experiencia.';
-    if (Device.isTouch) this.orient.classList.add('enabled');
+    this.orient.textContent = 'Puedes jugar en vertical u horizontal. Horizontal da más campo de visión.';
     this.root.appendChild(this.orient);
+    if (Device.isTouch) {
+      this.orient.classList.add('enabled');
+      setTimeout(() => this.orient.classList.remove('enabled'), 4500);
+    }
 
     // Panel de LUMINOSIDAD (aparece al pulsar [ o ])
     this.brightnessPanel = document.createElement('div');

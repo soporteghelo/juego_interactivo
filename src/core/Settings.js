@@ -32,13 +32,22 @@ export const QUALITY_PRESETS = {
     bloom: true,
     grain: true,
     vignette: true,
+    // Oclusion ambiental (GTAO): pase de pantalla completa que "asienta" props y roca
+    // (contacto oscuro). SOLO en 'alto' (desktop con margen); demasiado caro para GPU
+    // integrada/movil, donde el claroscuro ya lo dan la niebla y las luces puntuales.
+    ao: true,
     particleDensity: 1.0,
     drawDistance: 70,       // niebla: fondo perdido lejos
     fogNear: 14,
     fogFar: 40,
     maxDynamicLights: 36,
     lightPool: 16,          // luces reales (sin sombra) que siguen al jugador
-    streamingRadius: 4      // segmentos activos a cada lado del jugador
+    streamingRadius: 4,     // segmentos activos a cada lado del jugador
+    // `heavyDetail` (0..1): densidad de PROPS pesados que se fijan al CONSTRUIR el mundo
+    // (nichos peatonales, basura, mallas sobresalidas, rotulos dobles). El mundo se arma una
+    // sola vez con el preset inicial del dispositivo, asi que este valor decide cuanta
+    // geometria extra carga el celular. En escritorio se aprovecha todo el detalle.
+    heavyDetail: 1.0
   },
   medio: {
     label: 'Medio',
@@ -49,31 +58,45 @@ export const QUALITY_PRESETS = {
     bloom: true,
     grain: false,
     vignette: true,
+    ao: false,
     particleDensity: 0.6,
     drawDistance: 55,
     fogNear: 12,
     fogFar: 30,
     maxDynamicLights: 22,
     lightPool: 12,
-    streamingRadius: 3
+    streamingRadius: 3,
+    heavyDetail: 0.75
   },
   // Preset por defecto en celular: prioriza framerate sobre fidelidad.
   movil: {
     label: 'Movil',
-    pixelRatioCap: 1.5,
+    // pixelRatio 1.25 (antes 1.5): en pantallas de alta densidad rebaja ~30% el numero de
+    // fragmentos a sombrear — el mayor ahorro de GPU en celular sin ver "pixelado".
+    pixelRatioCap: 1.25,
     shadows: false,
     shadowMapSize: 256,
-    postprocessing: true,
-    bloom: true,           // el LED verde neon es clave del look; bloom barato
+    // Postprocesado APAGADO en celular: el EffectComposer renderiza la escena a un render
+    // target a resolucion completa y UnrealBloom encadena varios passes de pantalla completa
+    // (el mayor coste de fill-rate en GPU movil). Sin composer se renderiza directo al
+    // framebuffer con el tone mapping ACES del propio renderer. El LED verde neon sigue
+    // brillando por su material emisivo saturado, solo pierde el halo difuso del bloom.
+    postprocessing: false,
+    bloom: false,
     grain: false,
     vignette: false,
-    particleDensity: 0.35,
-    drawDistance: 40,
+    ao: false,
+    // Polvo minimo; la niebla volumetrica (MistSystem) se desactiva en tactil por overdraw.
+    particleDensity: 0.3,
+    drawDistance: 36,
     fogNear: 10,
-    fogFar: 24,
-    maxDynamicLights: 14,
-    lightPool: 7,
-    streamingRadius: 2
+    fogFar: 22,
+    maxDynamicLights: 12,
+    lightPool: 6,
+    streamingRadius: 2,
+    // Props pesados MUY reducidos: nichos peatonales mas espaciados, casi sin basura ni
+    // mallas sueltas, un solo rotulo por tunel. Recupera el framerate en gama media/baja.
+    heavyDetail: 0.4
   },
   bajo: {
     label: 'Bajo',
@@ -84,13 +107,15 @@ export const QUALITY_PRESETS = {
     bloom: false,
     grain: false,
     vignette: false,
-    particleDensity: 0.2,
-    drawDistance: 34,
+    ao: false,
+    particleDensity: 0.15,
+    drawDistance: 30,
     fogNear: 8,
-    fogFar: 18,
+    fogFar: 17,
     maxDynamicLights: 8,
     lightPool: 5,
-    streamingRadius: 2
+    streamingRadius: 2,
+    heavyDetail: 0.25
   }
 };
 
@@ -109,6 +134,10 @@ class SettingsState {
     this.controlScheme = 'desktop';
     // Semilla del mundo procedural (compartible para reproducir escenarios).
     this.worldSeed = (Math.random() * 0xffffffff) >>> 0;
+    // Modo de mundo: 'grid' POR DEFECTO — la mina COMPLETA del plano (galerías + cruceros +
+    // vía principal RN 96 + rampas a otro nivel + labores especiales). El corredor lineal
+    // antiguo solo con `?mapa=linear`.
+    this.worldMode = this._readWorldMode();
     this.audioEnabled = true;
     // Luminosidad de la mina: multiplicador aplicado a todas las luces de galeria
     // (PointLight/AmbientLight/HemiLight). NO afecta materiales emisivos (LEDs, cintas).
@@ -120,6 +149,24 @@ class SettingsState {
     this.lightPoolEnabled = true;
     this._listeners = new Set();
     this._brightnessListeners = new Set();
+  }
+
+  /**
+   * Lee el modo de mundo del parametro `?mapa=` de la URL ('grid'|'linear').
+   * Por DEFECTO el mundo es la retICula COMPLETA del plano (galerias + cruceros + rampas +
+   * labores); el corredor lineal antiguo queda disponible solo con `?mapa=linear`.
+   */
+  _readWorldMode() {
+    try {
+      const p = new URLSearchParams(window.location.search).get('mapa');
+      if (p === 'linear' || p === 'lineal') return 'linear';
+    } catch { /* SSR/entorno sin window: usa el valor por defecto */ }
+    return 'grid';
+  }
+
+  /** Fija el modo de mundo ('linear'|'grid'). */
+  setWorldMode(key) {
+    this.worldMode = key === 'grid' ? 'grid' : 'linear';
   }
 
   /** Aplica un preset por clave ('alto'|'medio'|'movil'|'bajo'). */

@@ -150,7 +150,9 @@ html, body {
 
 .hud-stats {
   position: fixed;
-  top: env(safe-area-inset-top, 8px); left: 10px;
+  /* Derecha: la esquina superior IZQUIERDA queda para el minimapa. */
+  top: env(safe-area-inset-top, 8px); right: 12px; left: auto;
+  text-align: right;
   font-size: 0.72rem;
   color: #7fd87f;
   font-family: 'Consolas', monospace;
@@ -492,7 +494,8 @@ html, body {
 .hud-mission {
   position: fixed;
   right: 14px;
-  top: env(safe-area-inset-top, 8px);
+  /* Debajo de la linea de stats (FPS·Calidad), que ahora va arriba a la derecha. */
+  top: calc(env(safe-area-inset-top, 8px) + 22px);
   max-width: 260px;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.55);
@@ -522,28 +525,59 @@ html, body {
 .hud-mission .mission-obj::before { content: '\25CB'; flex-shrink: 0; }
 .hud-mission .mission-obj.done::before { content: '\25CF'; color: #39ff14; }
 
-/* Aviso de rotacion: pide modo horizontal en celular en vertical. */
+/* Aviso NO bloqueante: toast breve que se auto-oculta. El juego funciona en vertical U
+   horizontal — ya NO se tapa la pantalla en modo vertical. */
 .orientation-hint {
   position: fixed;
-  inset: 0;
+  left: 50%;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
   display: none;
-  place-items: center;
+  max-width: 88vw;
   text-align: center;
-  background: #000;
+  background: rgba(0, 0, 0, 0.78);
   color: var(--amarillo-aviso);
-  z-index: 200;
-  padding: 30px;
-  font-size: 1.1rem;
+  border: 1px solid rgba(255, 204, 0, 0.4);
+  border-radius: 10px;
+  z-index: 60;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  pointer-events: none;
 }
-@media (max-width: 920px) and (orientation: portrait) {
-  .orientation-hint.enabled { display: grid; }
+.orientation-hint.enabled { display: block; }
+
+/* ─────────────── Controles tactiles en VERTICAL (portrait) ──────────────
+   Pantalla estrecha: controles algo mas compactos, respetando el area segura
+   (notch / barra de gestos) y moviendo el minimapa arriba para no chocar con
+   la botonera. Sin esto los controles quedaban pensados solo para horizontal. */
+@media (orientation: portrait) {
+  .touch-joystick {
+    left: 7%;
+    bottom: calc(5% + env(safe-area-inset-bottom, 0px));
+    width: 116px; height: 116px;
+  }
+  .touch-buttons {
+    right: 5%;
+    bottom: calc(4% + env(safe-area-inset-bottom, 0px));
+    grid-template-columns: repeat(2, 62px);
+    gap: 10px;
+  }
+  .touch-btn { width: 62px; height: 62px; font-size: 0.62rem; }
+  .hud-minimap {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    right: auto;
+    width: 104px; height: 104px;
+  }
 }
 
 /* ─────────────── Minimap GTA V (radar circular) ──────────────── */
 .hud-minimap {
   position: fixed;
-  right: 14px;
-  bottom: 80px;          /* justo encima del indicador de linterna */
+  left: 14px;
+  top: 14px;             /* esquina SUPERIOR IZQUIERDA */
   width:  180px;
   height: 180px;
   border-radius: 50%;
@@ -564,7 +598,7 @@ html, body {
   .hud-minimap {
     width:  120px;
     height: 120px;
-    bottom: 70px;
-    right: 8px;
+    top: 8px;
+    left: 8px;
   }
 }

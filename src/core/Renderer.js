@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Settings } from './Settings.js';
+import { Device } from './Device.js';
 
 /**
  * Configuracion del WebGLRenderer fiel a la "regla de oro" del md:
@@ -15,7 +16,10 @@ export class Renderer {
     this.container = container;
 
     this.instance = new THREE.WebGLRenderer({
-      antialias: Settings.current.pixelRatioCap > 1, // AA solo si hay margen
+      // AA solo en escritorio con margen. En tactil se desactiva: el MSAA cuesta ancho de
+      // banda/memoria en GPU movil y a pixelRatio 1.25+ apenas se aprecia; ademas cuando hay
+      // postprocesado el MSAA del framebuffer por defecto no hace nada (se renderiza a un RT).
+      antialias: !Device.isTouch && Settings.current.pixelRatioCap > 1,
       powerPreference: 'high-performance',
       stencil: false
     });
@@ -23,8 +27,9 @@ export class Renderer {
     this.instance.outputColorSpace = THREE.SRGBColorSpace;
     this.instance.toneMapping = THREE.ACESFilmicToneMapping;
     // Exposicion: control global de luminosidad de toda la escena renderizada.
-    // Triplicado a 6.0 respecto al baseline original (2.0) -> galerias 3x iluminadas.
-    this.instance.toneMappingExposure = 6.0;
+    // Bajada de 6.0 a 5.0 (junto con el recorte de luz ambiental en SceneManager) para
+    // recuperar el claroscuro del md: negros profundos, luces puntuales que resaltan.
+    this.instance.toneMappingExposure = 5.0;
 
     this._applyQuality(Settings.current);
     Settings.onChange((q) => this._applyQuality(q));

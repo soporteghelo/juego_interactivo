@@ -31,7 +31,7 @@ export class MissionManager {
       title: 'Induccion de Seguridad — NV-1600',
       objectives: [
         { id: 'epp', text: 'Leer la senal de Uso Obligatorio de EPP' },
-        { id: 'gestion', text: 'Revisar el tablero de gestion SSOMA/AESA' },
+        { id: 'gestion', text: 'Revisar el tablero de gestion SSOMA' },
         { id: 'tablero', text: 'Inspeccionar un tablero electrico' },
         { id: 'refugio', text: 'Ubicar e ingresar al Refugio Minero' }
       ]

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preview — Jumbo (módulo jumbo.js)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #cfd6dd; overflow: hidden; font-family: system-ui, sans-serif; }
+    #status { position:fixed; bottom:12px; left:12px; z-index:10; color:#123; background:rgba(255,255,255,.6); padding:6px 10px; border-radius:6px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div id="status">Cargando…</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+    import { crear as crearJumbo } from '../src/elementos/equipos/jumbo.js';
+
+    const params = new URLSearchParams(location.hash.slice(1));
+    const view = params.get('view') || '3q';
+    const rot = parseFloat(params.get('rot') || '0'); // giro extra del jumbo (rad)
+
+    const statusEl = document.getElementById('status');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xcfd6dd);
+
+    const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 200);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.4, 0.2);
+
+    // Cámaras fijas para juzgar la FORMA desde ángulos canónicos.
+    const R = 16;
+    const VIEWS = {
+      '3q':    [ 11,  6.5, 12 ],   // tres cuartos frontal (brazos hacia la cámara)
+      'side':  [ 16,  4.5,  0 ],   // lateral puro
+      'front': [  0,  4.0, 15 ],   // frente (brazos)
+      'rear3q':[-11,  6.5,-12 ],   // tres cuartos trasero (motor/carrete)
+      'top':   [  0.1, 18,  0.1 ], // planta
+      'boom':  [  3.0, 2.2,  4.2 ] // acercamiento al ensamblaje de brazos/feed
+    };
+    if (view === 'boom') controls.target.set(0.2, 0.7, 2.6);
+    camera.position.set(...(VIEWS[view] || VIEWS['3q']));
+
+    scene.add(new THREE.HemisphereLight(0xdfe8f2, 0x555049, 1.0));
+    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    key.position.set(8, 13, 9); key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 1, far: 40 });
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xbcd0ff, 0.8);
+    fill.position.set(-7, 5, -6); scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.9);
+    rim.position.set(-4, 6, 8); scene.add(rim);
+
+    const piso = new THREE.Mesh(new THREE.CircleGeometry(30, 48),
+      new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 1 }));
+    piso.rotation.x = -Math.PI / 2; piso.receiveShadow = true; scene.add(piso);
+    const grid = new THREE.GridHelper(30, 30, 0x77808a, 0x8b939c);
+    grid.position.y = 0.003; scene.add(grid);
+
+    let jumbo;
+    try {
+      jumbo = crearJumbo();
+      jumbo.rotation.y = rot;
+      jumbo.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(jumbo);
+      statusEl.textContent = '✓ Jumbo cargado — view=' + view;
+    } catch (e) {
+      statusEl.textContent = 'ERROR: ' + e.message;
+      console.error(e);
+    }
+
+    const clock = new THREE.Clock();
+    let elapsed = 0;
+    function animate() {
+      const dt = clock.getDelta();
+      elapsed += dt; jumbo?.userData.tick?.(dt, elapsed);
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    animate();
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>

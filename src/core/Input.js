@@ -20,7 +20,12 @@ export class Input {
 
     this.move = { x: 0, y: 0 };
     this.look = { x: 0, y: 0 };
-    this._held = { run: false, crouch: false };
+    // run/crouch: marcha del peaton. boomUp/boomDown/bucketIn/bucketOut: hidraulica del
+    // equipo conducido (los botones tactiles de DriveController/TouchControls los sostienen).
+    this._held = {
+      run: false, crouch: false,
+      boomUp: false, boomDown: false, bucketIn: false, bucketOut: false
+    };
     this._pressed = { jump: false, interact: false, flashlight: false, view: false };
 
     this.lookSensitivity = 0.0022; // raton (rad por pixel)

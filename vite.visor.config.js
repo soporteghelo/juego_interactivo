@@ -25,7 +25,9 @@ export default defineConfig({
   server: {
     host: true,
     port: 5001,
-    open: '/visor.html'
+    open: '/visor.html',
+    // Evita que el watcher se caiga con EBUSY sobre .glb grandes bloqueados (sync/AV).
+    watch: { ignored: ['**/*.glb'] }
   },
   build: {
     target: 'es2020',

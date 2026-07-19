@@ -14,7 +14,10 @@ export default defineConfig({
   server: {
     host: true,      // expone la IP de red local para probar en el celular
     port: 5000,
-    open: false
+    open: false,
+    // El watcher de Vite se cae con EBUSY sobre .glb grandes que quedan bloqueados
+    // (sync de nube / antivirus). Ignorarlos: no se importan en runtime.
+    watch: { ignored: ['**/*.glb'] }
   },
   build: {
     target: 'es2020',

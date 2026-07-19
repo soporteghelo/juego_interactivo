@@ -1,4 +1,4 @@
-# Simulador de Mina Subterránea — Cerro Lindo (Three.js)
+# Simulador de Mina Subterránea (Three.js)
 
 Simulador/juego de mina subterránea **hiperrealista** para navegador, orientado a
 entrenamiento operacional, seguridad y salud ocupacional (SSOMA), inspecciones,
@@ -6,7 +6,7 @@ investigación de incidentes, identificación de peligros, simulacros de emergen
 recorridos virtuales.
 
 Todo el diseño visual deriva **exclusivamente** de la referencia
-[`mineria-draw.md`](./mineria-draw.md) (Unidad Minera Cerro Lindo, NEXA / AESA): paleta de
+[`mineria-draw.md`](./mineria-draw.md) (unidad minera subterránea, NEXA): paleta de
 colores, "regla de oro" de iluminación (oscuridad total, solo fuentes puntuales), EPP,
 señalética, elementos estructurales y dimensiones técnicas.
 

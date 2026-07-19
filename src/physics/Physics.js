@@ -32,11 +32,16 @@ export class Physics {
 
   /**
    * Crea un colisionador estatico tipo caja (para paredes/piso/techo de los tramos).
-   * @param {{hx:number,hy:number,hz:number, pos:[number,number,number]}} spec
+   *
+   * `rot` es un cuaternion opcional {x,y,z,w}: en el modo lineal los tramos no rotan y se
+   * omite (comportamiento identico al historico). En el modo retICula (GridWorld) las galerias
+   * corren en X y los cruceros en Z, por lo que sus cajas van rotadas sobre el eje Y.
+   * @param {{hx:number,hy:number,hz:number, pos:[number,number,number], rot?:{x:number,y:number,z:number,w:number}}} spec
    * @returns {object} collider de Rapier
    */
-  addStaticCuboid({ hx, hy, hz, pos }) {
+  addStaticCuboid({ hx, hy, hz, pos, rot }) {
     const bodyDesc = this.RAPIER.RigidBodyDesc.fixed().setTranslation(pos[0], pos[1], pos[2]);
+    if (rot) bodyDesc.setRotation({ x: rot.x, y: rot.y, z: rot.z, w: rot.w });
     const body = this.world.createRigidBody(bodyDesc);
     const colDesc = this.RAPIER.ColliderDesc.cuboid(hx, hy, hz);
     return this.world.createCollider(colDesc, body);
@@ -73,5 +78,20 @@ export class Physics {
     controller.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
 
     return { body, collider, controller };
+  }
+
+  /**
+   * Cápsula CINEMÁTICA para un personaje NO jugador (NPC): un cuerpo que el NPC reubica cada
+   * frame. No resuelve colisiones por sí mismo, pero el character controller del jugador SÍ
+   * colisiona contra él → el jugador no puede atravesar a las demás personas.
+   * @returns {{body:object, collider:object}}
+   */
+  createKinematicCapsule({ position, radius = 0.3, halfHeight = 0.6 }) {
+    const bodyDesc = this.RAPIER.RigidBodyDesc.kinematicPositionBased()
+      .setTranslation(position.x, position.y, position.z);
+    const body = this.world.createRigidBody(bodyDesc);
+    const colDesc = this.RAPIER.ColliderDesc.capsule(halfHeight, radius);
+    const collider = this.world.createCollider(colDesc, body);
+    return { body, collider };
   }
 }

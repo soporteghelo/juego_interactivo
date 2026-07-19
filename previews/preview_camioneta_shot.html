@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8" /><title>shot camioneta</title>
+<style>html,body{margin:0;height:100%;background:#c9cdd2;overflow:hidden}</style></head>
+<body>
+<script type="module">
+  import * as THREE from 'three';
+  import { crear } from '../src/elementos/equipos/camioneta.js';
+
+  const P = new URLSearchParams(location.search);
+  const view = P.get('view') || 'front';
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.setSize(1100, 720);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xc9cdd2);
+
+  const camera = new THREE.PerspectiveCamera(38, 1100 / 720, 0.1, 200);
+  const cams = {
+    front: [8.5, 3.6, 8.5, 0, 1.1, 0.3],
+    rear:  [-8.5, 3.6, -8.5, 0, 1.1, -0.3],
+    side:  [0.2, 2.4, 11, 0, 1.05, 0],
+    top:   [4, 9, 6, 0, 0.9, 0],
+  };
+  const c = cams[view];
+  camera.position.set(c[0], c[1], c[2]);
+  camera.lookAt(c[3], c[4], c[5]);
+
+  scene.add(new THREE.HemisphereLight(0xdfe6f0, 0x6a6258, 1.0));
+  const key = new THREE.DirectionalLight(0xfff4e6, 2.4);
+  key.position.set(7, 12, 9); key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 40 });
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xbcd0ff, 0.7);
+  fill.position.set(-8, 5, -6); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.5);
+  rim.position.set(0, 4, -10); scene.add(rim);
+
+  const piso = new THREE.Mesh(new THREE.CircleGeometry(30, 48),
+    new THREE.MeshStandardMaterial({ color: 0x8f9298, roughness: 1 }));
+  piso.rotation.x = -Math.PI / 2; piso.receiveShadow = true; scene.add(piso);
+
+  const veh = crear();
+  veh.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(veh);
+
+  // render varios frames para asentar sombras/tick
+  let f = 0;
+  function loop() {
+    veh.userData.tick?.(0.016, f * 0.016);
+    renderer.render(scene, camera);
+    if (++f < 30) requestAnimationFrame(loop);
+    else { window.__done = true; document.title = 'DONE'; }
+  }
+  loop();
+</script>
+</body>
+</html>
