@@ -14,6 +14,7 @@ import * as perno from './sostenimiento/perno.js';
 import * as malla from './sostenimiento/malla.js';
 import * as shotcrete from './sostenimiento/shotcrete.js';
 import * as rocaSuelta from './entorno/roca_suelta.js';
+import * as rocaColgada from './entorno/roca_colgada.js';
 import * as charco from './entorno/charco.js';
 import * as baliza from './entorno/baliza.js';
 import * as senal from './senal/senal.js';
@@ -64,6 +65,7 @@ import * as punteraAgua from './servicios/puntera_agua.js';
 import * as estacionTotal from './entorno/estacion_total.js';
 import * as frenteCargado from './entorno/frente_cargado.js';
 import * as mallaNaranja from './ssoma/malla_naranja.js';
+import * as estarcidoLabor from './senal/estarcido_labor.js';
 
 // Reexporta los modulos por si se quieren importar directamente.
 export {
@@ -72,13 +74,18 @@ export {
   ventilador, camion, camioneta, jumbo, raptor, scoop, empernador, shotcretera, mixer, desatador,
   telehandler, panelInformativo, ptTag, refugio, refugioDraeger,
   nichoRefugio, persona, nichoElectrico, extintor, mallaSobresalida, cordonBloqueo, basura,
-  barretillas, portaherramientas, punteraAgua, estacionTotal, frenteCargado, mallaNaranja
+  barretillas, portaherramientas, punteraAgua, estacionTotal, frenteCargado, mallaNaranja,
+  estarcidoLabor
 };
 
 /**
  * Lista plana de elementos visualizables. Las VARIANTES (sobresalido, antiguo, etc.) y los
  * distintos tipos de senal aparecen como entradas separadas para inspeccionarlas una a una.
- * @type {Array<{id:string, nombre:string, descripcion:string, crear:Function}>}
+ *
+ * `recorrido` (opcional) es el GUION del recorrido guiado del visor: presentacion animada
+ * paso a paso de los subelementos, con texto y angulo de camara por paso. Si un elemento no
+ * lo define, el visor arma un recorrido generico con sus subelementos.
+ * @type {Array<{id:string, nombre:string, descripcion:string, crear:Function, recorrido?:object}>}
  */
 export const CATALOGO = [
   // --- Sostenimiento ---
@@ -88,10 +95,14 @@ export const CATALOGO = [
   { id: 'malla_sobresalida_plana', nombre: 'Malla SOBRESALIDA / rasgada', descripcion: 'Malla abombada por roca inestable.', crear: () => malla.crear({ sobresalida: true }) },
   { id: 'malla_sobresalida', nombre: mallaSobresalida.meta.nombre, descripcion: mallaSobresalida.meta.descripcion, crear: () => mallaSobresalida.crear({ side: 1, wallX: 0 }) },
   { id: 'shotcrete', nombre: 'Shotcrete craquelado', descripcion: shotcrete.meta.descripcion, crear: () => shotcrete.crear({ craquelado: true }) },
+  { id: 'manto_malla', nombre: 'Manto de malla (herradura completa)', descripcion: 'Tejido eslabonado continuo colgado de los pernos sobre hastiales y boveda, con comba y jorobas.', crear: () => malla.crearManto({ width: 4.5, height: 4.5, length: 8, archRatio: 0.4, seed: 5 }) },
+  { id: 'costura_manto', nombre: 'Costura de alambre del manto', descripcion: 'Zigzag de alambre galvanizado que cose el traslape entre paños de malla.', crear: () => malla.crearCosturaManto({ width: 4.5, height: 4.5, length: 8, archRatio: 0.4, seed: 5 }) },
 
   // --- Piso / entorno ---
   { id: 'roca_suelta', nombre: 'Roca suelta', descripcion: rocaSuelta.meta.descripcion, crear: () => rocaSuelta.crear({ mineralizada: false }) },
   { id: 'roca_mineralizada', nombre: 'Roca mineralizada (sulfuros)', descripcion: 'Escombros con mineralizacion dorada.', crear: () => rocaSuelta.crear({ mineralizada: true }) },
+  { id: 'roca_colgada', nombre: rocaColgada.meta.nombre, descripcion: rocaColgada.meta.descripcion, crear: () => rocaColgada.crear({ tipo: 'roca', escala: 1.1 }) },
+  { id: 'shotcrete_colgado', nombre: 'Shotcrete por desprenderse', descripcion: 'Panel de shotcrete despegado de la corona, con la malla asomando.', crear: () => rocaColgada.crear({ tipo: 'shotcrete', escala: 1.1 }) },
   { id: 'charco', nombre: 'Charco de agua', descripcion: charco.meta.descripcion, crear: () => charco.crear({}) },
   { id: 'baliza', nombre: 'Baliza / delineador', descripcion: baliza.meta.descripcion, crear: () => baliza.crear() },
 
@@ -153,8 +164,8 @@ export const CATALOGO = [
 
   // --- Refugio ---
   { id: 'refugio', nombre: 'Refugio minero (Drager)', descripcion: refugio.meta.descripcion, crear: () => refugio.crear() },
-  { id: 'refugio_draeger', nombre: refugioDraeger.meta.nombre, descripcion: refugioDraeger.meta.descripcion, crear: () => refugioDraeger.crear() },
-  { id: 'refugio_draeger_ocupado', nombre: 'Refugio Dräger — OCUPADO (semáforo rojo)', descripcion: 'Cámara Dräger con puerta abierta y semáforo en rojo (ocupado).', crear: () => refugioDraeger.crear({ ocupado: true }) },
+  { id: 'refugio_draeger', nombre: refugioDraeger.meta.nombre, descripcion: refugioDraeger.meta.descripcion, crear: () => refugioDraeger.crear(), recorrido: refugioDraeger.recorrido },
+  { id: 'refugio_draeger_ocupado', nombre: 'Refugio Dräger — OCUPADO (semáforo rojo)', descripcion: 'Cámara Dräger con puerta abierta y semáforo en rojo (ocupado).', crear: () => refugioDraeger.crear({ ocupado: true }), recorrido: refugioDraeger.recorrido },
   { id: 'nicho_refugio', nombre: nichoRefugio.meta.nombre, descripcion: nichoRefugio.meta.descripcion, crear: () => nichoRefugio.crear() },
   { id: 'nicho_electrico', nombre: 'Nicho electrico (simple)', descripcion: nichoElectrico.meta.descripcion, crear: () => nichoElectrico.crear({ doble: false }) },
   { id: 'nicho_electrico_doble', nombre: 'Nicho electrico DOBLE', descripcion: 'Nicho con 2 tableros electricos empotrados en el hastial.', crear: () => nichoElectrico.crear({ doble: true }) },
@@ -168,6 +179,8 @@ export const CATALOGO = [
     crear: () => senal.crearSenal(tipo)
   })),
   { id: 'chevron', nombre: 'Chevron de direccion', descripcion: chevron.meta.descripcion, crear: () => chevron.crear() },
+  { id: 'estarcido_labor', nombre: estarcidoLabor.meta.nombre, descripcion: estarcidoLabor.meta.descripcion, crear: () => estarcidoLabor.crear({ codigo: 'CX-026' }) },
+  { id: 'banda_hastial', nombre: 'Banda pintada del hastial', descripcion: 'Franja de pintura corrida al pie de la labor: marca el limite de calzada y da la linea de fuga.', crear: () => estarcidoLabor.crearBanda({ length: 8 }) },
 
   // --- Herramientas ---
   { id: 'portaherramientas', nombre: portaherramientas.meta.nombre, descripcion: portaherramientas.meta.descripcion, crear: () => portaherramientas.crear() },

@@ -4,6 +4,7 @@ import { CATALOGO } from '../elementos/index.js';
 import { recolectarSubelementos } from '../elementos/_comun/subelemento.js';
 import { disposeObject } from '../utils/Disposable.js';
 import { precargarMinero, actualizar as actualizarMinero } from '../elementos/personas/minero.js';
+import { RecorridoGuiado } from './RecorridoGuiado.js';
 
 /**
  * VISUALIZADOR DE ELEMENTOS.
@@ -20,6 +21,12 @@ import { precargarMinero, actualizar as actualizarMinero } from '../elementos/pe
  * PERSISTENCIA: la selección (elemento + subelemento) se guarda en
  * localStorage; al recargar la página (p. ej. por un cambio de código con
  * Vite) se restaura la misma vista en lugar de volver al primer objeto.
+ *
+ * RECORRIDO GUIADO: los elementos con subelementos pueden presentarse paso a
+ * paso (botón "▶ Recorrido guiado"). Ver `RecorridoGuiado.js`. Si el elemento
+ * define un guion propio en el CATALOGO (`recorrido`), se usa ese —con su
+ * orden, textos y ángulos de cámara—; si no, se arma uno genérico recorriendo
+ * sus subelementos en orden de construcción.
  */
 
 const holder = document.getElementById('canvas-holder');
@@ -150,6 +157,10 @@ function mostrar(index) {
   const el = CATALOGO[index];
   if (!el) return;
 
+  // El recorrido guiado sustituye materiales del elemento por clones temporales:
+  // hay que cerrarlo ANTES de liberar el objeto o se disposearían los clones.
+  tour.detener(false);
+
   if (actual) {
     // El minero FBX comparte geometría/materiales entre clones (SkeletonUtils.clone):
     // NO se debe disposear o romperíamos los siguientes clones. Solo se quita de la escena.
@@ -181,6 +192,7 @@ function mostrar(index) {
 
   encuadrar(actual);
   actualizarInfo();
+  actualizarBtnTour();
   guardarSeleccion();
   pintarLista(search.value);
 }
@@ -192,6 +204,7 @@ function mostrar(index) {
  */
 function seleccionarSub(idSub) {
   if (!actual) return;
+  tour.detener(false);   // elegir una parte a mano cancela la presentación
   subSel = idSub
     ? subGrupos.find((s) => s.userData.subelemento.id === idSub) || null
     : null;
@@ -272,6 +285,128 @@ function aplicarWireframe() {
   });
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  RECORRIDO GUIADO (presentación animada paso a paso)
+// ══════════════════════════════════════════════════════════════════════════
+
+const escenaEl   = document.getElementById('escena');
+const btnTour    = document.getElementById('btn-tour');
+const tourEl     = document.getElementById('tour');
+const tourPaso   = document.getElementById('tour-paso');
+const tourTitulo = document.getElementById('tour-titulo');
+const tourTexto  = document.getElementById('tour-texto');
+const tourAvance = document.getElementById('tour-avance');
+const tourPlay   = document.getElementById('tour-play');
+
+const tour = new RecorridoGuiado({
+  scene, camera, controls,
+  onPaso: (i, total, paso) => {
+    tourPaso.textContent   = `PASO ${String(i + 1).padStart(2, '0')} / ${total}`;
+    tourTitulo.textContent = paso.titulo || '';
+    tourTexto.textContent  = paso.texto || '';
+    tourAvance.style.width = '0%';
+  },
+  onProgreso: (frac) => { tourAvance.style.width = `${(frac * 100).toFixed(1)}%`; },
+  onFin: () => {
+    escenaEl.classList.remove('tour-activo');
+    tourEl.hidden = true;
+    btnTour.textContent = '▶ Recorrido guiado';
+    tourPlay.textContent = '❚❚';
+    // Devuelve la vista del elemento completo tal como estaba antes del tour.
+    if (actual) { aislar(actual, subSel); encuadrar(subSel || actual); }
+    actualizarInfo();
+  }
+});
+
+/**
+ * Arma los pasos del recorrido del elemento actual: guion propio del CATALOGO
+ * si existe, o uno genérico con sus subelementos en orden de construcción.
+ * @returns {Array|null} `null` si el elemento no tiene nada que recorrer
+ */
+function construirPasos() {
+  const el = actual?.userData?.__meta;
+  if (!el || !subGrupos.length) return null;
+  const porId = new Map(subGrupos.map((s) => [s.userData.subelemento.id, s]));
+
+  const guion = el.recorrido?.pasos;
+  if (guion?.length) {
+    return guion
+      .filter((p) => !p.sub || porId.has(p.sub))
+      .map((p) => {
+        const grupo = p.sub ? porId.get(p.sub) : null;
+        return {
+          ...p,
+          grupo,
+          titulo: p.titulo || grupo?.userData.subelemento.nombre || el.nombre,
+          texto:  p.texto  || grupo?.userData.subelemento.descripcion || el.descripcion || ''
+        };
+      });
+  }
+
+  if (subGrupos.length < 2) return null;
+  return [
+    { grupo: null, titulo: el.nombre, texto: el.descripcion || '', dur: 4.5, dist: 1.35 },
+    ...subGrupos.map((s) => ({
+      grupo: s,
+      titulo: s.userData.subelemento.nombre,
+      texto:  s.userData.subelemento.descripcion || ''
+    }))
+  ];
+}
+
+/** ¿El elemento visible se puede presentar paso a paso? */
+function hayRecorrido() {
+  const el = actual?.userData?.__meta;
+  return !!(el && subGrupos.length && (el.recorrido?.pasos?.length || subGrupos.length >= 2));
+}
+
+/** Muestra el botón de recorrido solo en los elementos que tienen partes que enseñar. */
+function actualizarBtnTour() {
+  const disponible = hayRecorrido();
+  btnTour.hidden = !disponible;
+  if (disponible) {
+    const n = actual.userData.__meta.recorrido?.pasos?.length || subGrupos.length + 1;
+    btnTour.title = `Presentación animada de las ${n} partes de este elemento (tecla R)`;
+  }
+}
+
+function iniciarTour() {
+  const pasos = construirPasos();
+  if (!pasos?.length) return;
+  // El recorrido necesita el elemento COMPLETO visible (aunque haya un
+  // subelemento aislado) para poder atenuar unas piezas y destacar otras.
+  aislar(actual, null);
+  if (!tour.iniciar(actual, pasos)) return;
+  escenaEl.classList.add('tour-activo');
+  tourEl.hidden = false;
+  btnTour.textContent = '■ Salir del recorrido';
+  tourPlay.textContent = '❚❚';
+}
+
+btnTour.addEventListener('click', () => {
+  if (tour.activo) tour.detener(false);
+  else iniciarTour();
+});
+document.getElementById('tour-prev').addEventListener('click', () => tour.anterior());
+document.getElementById('tour-next').addEventListener('click', () => tour.siguiente());
+document.getElementById('tour-exit').addEventListener('click', () => tour.detener(false));
+tourPlay.addEventListener('click', () => {
+  tourPlay.textContent = tour.alternarPausa() ? '▶' : '❚❚';
+});
+
+// Atajos de teclado del recorrido (se ignoran mientras se escribe en el buscador)
+window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return;
+  if (!tour.activo) {
+    if (e.code === 'KeyR' && hayRecorrido()) { e.preventDefault(); iniciarTour(); }
+    return;
+  }
+  if (e.code === 'ArrowRight') { e.preventDefault(); tour.siguiente(); }
+  else if (e.code === 'ArrowLeft') { e.preventDefault(); tour.anterior(); }
+  else if (e.code === 'Space') { e.preventDefault(); tourPlay.textContent = tour.alternarPausa() ? '▶' : '❚❚'; }
+  else if (e.code === 'Escape') { e.preventDefault(); tour.detener(false); }
+});
+
 // ── Controles de UI ───────────────────────────────────────────────────────
 document.getElementById('autorot').addEventListener('change', (e) => {
   autoRotar = e.target.checked;
@@ -308,11 +443,15 @@ function animar() {
   const dt = clock.getDelta();
   const t  = clock.elapsedTime;
 
-  // Auto-rotacion: se pausa mientras el usuario interactua con el objeto
-  // o mientras hay un SUBELEMENTO aislado (inspección estática).
-  if (autoRotar && actual && !interactuando && !subSel) {
+  // Auto-rotacion: se pausa mientras el usuario interactua con el objeto,
+  // mientras hay un SUBELEMENTO aislado (inspección estática) o durante el
+  // recorrido guiado (allí la cámara es la que se mueve, no el objeto).
+  if (autoRotar && actual && !interactuando && !subSel && !tour.activo) {
     actual.rotation.y += dt * 0.45;
   }
+
+  // Recorrido guiado: mueve cámara, opacidades y marcador (antes de controls.update)
+  tour.actualizar(dt);
 
   // Minero FBX: avanza su animación de esqueleto (camina en el sitio) + EPP en huesos.
   // Velocidad nominal de marcha → cadencia natural (timeScale≈1) en la vista del visor.

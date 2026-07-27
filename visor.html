@@ -136,6 +136,73 @@
       width: 15px; height: 15px;
     }
 
+    /* ══════════════════════════════════════════════════════
+       RECORRIDO GUIADO (presentacion animada paso a paso)
+    ══════════════════════════════════════════════════════ */
+
+    /* Boton de arranque: bajo la caja de opciones */
+    #btn-tour {
+      position: absolute; top: 58px; right: 12px; z-index: 6;
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0,0,0,0.52); border: 1px solid #2c333c;
+      color: #39ff14; font-size: 0.78rem; letter-spacing: 0.04em;
+      font-family: inherit;
+      padding: 7px 12px; border-radius: 8px; cursor: pointer;
+      backdrop-filter: blur(4px);
+      -webkit-tap-highlight-color: transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    #btn-tour:hover { border-color: rgba(57,255,20,0.55); background: rgba(0,0,0,0.7); }
+
+    /* Panel del recorrido (sustituye a #info mientras dura) */
+    #tour {
+      position: absolute; left: 12px; bottom: 12px; z-index: 6;
+      width: min(620px, calc(100% - 24px));
+      background: rgba(20,24,30,0.90);
+      border: 1px solid #2c333c; border-radius: 10px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+      animation: tour-entra 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes tour-entra {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* Barra de avance del paso (transicion de camara + tiempo de lectura) */
+    #tour-barra  { height: 3px; background: #2c333c; }
+    #tour-avance {
+      display: block; height: 100%; width: 0;
+      background: linear-gradient(90deg, #39ff14, #ffcc00);
+      transition: width 0.12s linear;
+    }
+
+    #tour-cuerpo { padding: 12px 16px 6px; }
+    #tour-paso {
+      font-family: Consolas, monospace; font-size: 0.68rem;
+      letter-spacing: 0.14em; color: #39ff14;
+    }
+    #tour-titulo { font-size: 1.02rem; color: #ffcc00; margin: 5px 0 6px; }
+    #tour-texto  { font-size: 0.84rem; line-height: 1.5; color: #c8d2dc; }
+
+    #tour-btns { display: flex; align-items: center; gap: 6px; padding: 10px 16px 12px; }
+    #tour-btns button {
+      background: #232a32; border: 1px solid #2c333c; color: #cfe0ee;
+      font-family: inherit; font-size: 0.82rem;
+      padding: 7px 13px; border-radius: 6px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    #tour-btns button:hover { border-color: rgba(57,255,20,0.55); color: #39ff14; }
+    #tour-exit { margin-left: auto; }
+    #tour-exit:hover { border-color: rgba(255,90,90,0.6) !important; color: #ff7a7a !important; }
+
+    /* Durante el recorrido, el panel de info fijo estorba */
+    #escena.tour-activo #info { display: none; }
+
+    #btn-tour[hidden], #tour[hidden] { display: none !important; }
+
     /* ── Boton flotante MENU (solo mobile) ── */
     #btn-panel {
       display: none;
@@ -221,6 +288,27 @@
 
       /* Boton panel: alejado del notch superior */
       #btn-panel { top: calc(env(safe-area-inset-top, 0px) + 12px); }
+
+      /* ── Recorrido guiado en mobile ── */
+      #btn-tour {
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        right: 10px; font-size: 0.82rem; padding: 9px 13px;
+      }
+      #tour {
+        left: 8px; right: 8px; width: auto;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+        max-height: 52dvh;
+        display: flex; flex-direction: column;
+      }
+      #tour-cuerpo { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+      #tour-titulo { font-size: 0.95rem; }
+      #tour-texto  { font-size: 0.8rem; }
+      #tour-btns   { padding: 8px 12px 10px; }
+      #tour-btns button { padding: 9px 12px; }
+      /* Las opciones viven en la esquina inferior derecha: chocarian con el panel */
+      #escena.tour-activo #controles { display: none; }
+      /* El hint de gestos queda debajo del boton de salir: estorba mas que ayuda */
+      #escena.tour-activo .hint { display: none; }
     }
   </style>
 </head>
@@ -267,11 +355,30 @@
         <label><input id="wire"    type="checkbox"          /> Wireframe</label>
       </div>
 
+      <!-- Recorrido guiado: arranque -->
+      <button id="btn-tour" hidden>▶ Recorrido guiado</button>
+
       <!-- Info del elemento seleccionado -->
       <div id="info">
         <h2 id="nombre">—</h2>
         <p  id="desc"></p>
         <p  id="dims"></p>
+      </div>
+
+      <!-- Recorrido guiado: panel del paso actual -->
+      <div id="tour" hidden>
+        <div id="tour-barra"><i id="tour-avance"></i></div>
+        <div id="tour-cuerpo">
+          <span id="tour-paso">PASO 01</span>
+          <h2 id="tour-titulo">—</h2>
+          <p  id="tour-texto"></p>
+        </div>
+        <div id="tour-btns">
+          <button id="tour-prev" title="Parte anterior (←)">◀◀</button>
+          <button id="tour-play" title="Pausar / reanudar (espacio)">❚❚</button>
+          <button id="tour-next" title="Parte siguiente (→)">▶▶</button>
+          <button id="tour-exit" title="Salir del recorrido (Esc)">✕ Salir</button>
+        </div>
       </div>
     </section>
 
@@ -279,6 +386,37 @@
 
   <!-- ── Logica del panel mobile (puro DOM, sin Three.js) ── -->
   <script>
+    // Bajo file:// (doble clic) los imports "bare" de Three.js NO se resuelven y el
+    // modulo del visor no arranca: la pantalla quedaria en blanco. Se avisa y se
+    // apunta a la version autocontenida (visor-standalone.html) que si funciona sin
+    // servidor. Generala con: npm run build:visor
+    // [FILE_GUARD_START] — build-visor.mjs elimina este bloque en el standalone.
+    if (location.protocol === 'file:') {
+      document.addEventListener('DOMContentLoaded', () => {
+        const aviso = document.createElement('div');
+        aviso.style.cssText =
+          'position:fixed;inset:0;z-index:1000;display:flex;align-items:center;' +
+          'justify-content:center;padding:24px;background:#15181d;color:#e8f0ff;' +
+          "font-family:'Segoe UI',Roboto,Arial,sans-serif;text-align:center;";
+        aviso.innerHTML =
+          '<div style="max-width:520px">' +
+          '<h1 style="color:#39ff14;font-size:1.1rem;margin-bottom:14px">Este archivo necesita un servidor</h1>' +
+          '<p style="color:#c8d2dc;line-height:1.55;font-size:0.92rem">' +
+          '<code>visor.html</code> carga Three.js con imports de módulo que el navegador ' +
+          'no resuelve al abrirlo con doble clic (<code>file://</code>).</p>' +
+          '<p style="color:#c8d2dc;line-height:1.55;font-size:0.92rem;margin-top:12px">' +
+          'Para verlo <b>sin servidor</b>, abre <b style="color:#ffcc00">visor-standalone.html</b> ' +
+          '(un solo archivo autocontenido). Si no existe, generalo con:</p>' +
+          '<pre style="margin:12px auto 0;display:inline-block;background:#11151a;border:1px solid #2c333c;' +
+          'padding:10px 16px;border-radius:8px;color:#7fd87f;font-size:0.9rem">npm run build:visor</pre>' +
+          '<p style="color:#7a8694;font-size:0.8rem;margin-top:18px">' +
+          'O levanta el dev server con <code>npm run dev:visor</code> y abrelo por http.</p>' +
+          '</div>';
+        document.body.appendChild(aviso);
+      });
+    }
+    // [FILE_GUARD_END]
+
     const panel      = document.getElementById('panel');
     const overlay    = document.getElementById('overlay');
     const btnPanel   = document.getElementById('btn-panel');
