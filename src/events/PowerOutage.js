@@ -12,17 +12,29 @@ export function createPowerOutage({ scene, world }) {
   if (world) world._poolPaused = true;
 
   const saved = [];
-  scene.traverse((o) => {
+  // Los tramos LEJANOS estan desenganchados de la escena por rendimiento (ver
+  // WorldRuntime._mostrar), asi que `scene.traverse` ya no los alcanza: se recorren aparte.
+  // El `vistos` evita atenuar dos veces un material compartido —seria 0.04² y al restaurar
+  // quedaria a oscuras, porque la segunda copia habria guardado el valor ya atenuado.
+  const vistos = new Set();
+  const apagar = (raiz) => raiz.traverse((o) => {
+    if (vistos.has(o)) return;
+    vistos.add(o);
     if (o.isLight && o.type !== 'AmbientLight') {
       saved.push({ light: o, intensity: o.intensity });
       o.intensity = 0;
     }
     // Atenua tambien los emisivos (LED) para que se "apaguen".
-    if (o.isMesh && o.material && 'emissiveIntensity' in o.material && o.material.emissive) {
-      saved.push({ mat: o.material, emissive: o.material.emissiveIntensity });
-      o.material.emissiveIntensity *= 0.04;
+    const mat = o.isMesh ? o.material : null;
+    if (mat && !vistos.has(mat) && 'emissiveIntensity' in mat && mat.emissive) {
+      vistos.add(mat);
+      saved.push({ mat, emissive: mat.emissiveIntensity });
+      mat.emissiveIntensity *= 0.04;
     }
   });
+
+  apagar(scene);
+  for (const grupo of world?.gruposFueraDeEscena?.() ?? []) apagar(grupo);
 
   let life = 0;
   const duration = 6;

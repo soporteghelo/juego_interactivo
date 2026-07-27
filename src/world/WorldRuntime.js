@@ -78,16 +78,11 @@ export class WorldRuntime {
     this._lightSpecs = poolable;
     this._poolLights = [];
     if (Settings.lightPoolEnabled && poolable.length) {
-      const poolSize = Math.min(Settings.current.lightPool ?? 12, poolable.length);
-      for (let i = 0; i < poolSize; i++) {
-        const pl = new THREE.PointLight(0xffffff, 0, 10, 2);
-        pl.castShadow = false;
-        this.lightsGroup.add(pl);
-        this._poolLights.push(pl);
-      }
+      this._resizeLightPool(Settings.current.lightPool ?? 12);
       this._lightAccum = 0;
       this._assignPoolLights();
     }
+    Settings.onChange((quality) => this._resizeLightPool(quality.lightPool ?? 12));
 
     // Reacciona al control de luminosidad del jugador en tiempo real.
     Settings.onBrightness((v) => { this._applyBrightness(v); this._assignPoolLights(); });
@@ -154,6 +149,9 @@ export class WorldRuntime {
    * EXENTOS (siguen animables): los subarboles con `userData.tick` (ventiladores, balizas,
    * semaforos) y los INTERACTUABLES (puertas de refugio) — cualquier cosa que pueda cambiar
    * su transform en runtime.
+   *
+   * Ademas deja HORNEADA la matriz de mundo de cada tramo. Como su transform ya no cambia,
+   * sigue siendo valida aunque el tramo salga y vuelva a entrar en la escena (ver `_mostrar`).
    */
   _freezeStatic() {
     for (const seg of this.segments) {
@@ -170,7 +168,43 @@ export class WorldRuntime {
         o.updateMatrix();            // deja la matriz local al dia ANTES de congelar
         o.matrixAutoUpdate = false;
       });
+
+      // Matriz de mundo horneada: el tramo ya no se mueve nunca mas.
+      seg.group.updateMatrixWorld(true);
     }
+  }
+
+  /**
+   * Muestra u OCULTA un tramo — y, sobre todo, lo SACA del grafo de escena cuando esta lejos.
+   *
+   * `visible = false` no basta: Three recorre igualmente todo el subarbol en cada frame
+   * (`updateMatrixWorld` en 0.166 no tiene poda por `matrixWorldAutoUpdate`; esa guarda llego
+   * despues). Con el mapa entero cargado eso son ~23.000 objetos visitados por frame para
+   * atender a los ~6.000 que de verdad estan cerca. Desenganchando el grupo de la escena, ni
+   * el recorrido de matrices ni el culling lo ven siquiera.
+   *
+   * Se mantiene ADEMAS el flag `visible`, porque otros sistemas (WorkSiteSystem, VentFlow,
+   * VaporSystem, HaulCycle) lo consultan para decidir si animan ese tramo.
+   *
+   * Volver a engancharlo es seguro sin recalcular nada: su matriz de mundo esta horneada
+   * (`_freezeStatic`) y la escena esta en el origen, asi que sigue siendo correcta.
+   */
+  _mostrar(seg, visible) {
+    if (seg.group.visible !== visible) seg.group.visible = visible;
+    if (visible) {
+      if (seg.group.parent !== this.scene) this.scene.add(seg.group);
+    } else if (seg.group.parent === this.scene) {
+      this.scene.remove(seg.group);
+    }
+  }
+
+  /** Grupos de tramo que ahora mismo NO cuelgan de la escena (los lejanos). */
+  gruposFueraDeEscena() {
+    const fuera = [];
+    for (const seg of this.segments) {
+      if (seg.group.parent !== this.scene) fuera.push(seg.group);
+    }
+    return fuera;
   }
 
   /**
@@ -203,6 +237,24 @@ export class WorldRuntime {
     }
   }
 
+  /** Ajusta el numero real de luces cuando cambia el preset, no solo el texto del HUD. */
+  _resizeLightPool(requested) {
+    if (!Settings.lightPoolEnabled || !this._lightSpecs || !this.lightsGroup) return;
+    const target = Math.min(requested, this._lightSpecs.length);
+    while (this._poolLights.length < target) {
+      const light = new THREE.PointLight(0xffffff, 0, 10, 2);
+      light.castShadow = false;
+      this.lightsGroup.add(light);
+      this._poolLights.push(light);
+    }
+    while (this._poolLights.length > target) {
+      const light = this._poolLights.pop();
+      this.lightsGroup.remove(light);
+      light.dispose?.();
+    }
+    this._assignPoolLights();
+  }
+
   /** Escala la intensidad de las luces FIJAS sin tocar emissive/materials (el pool se escala aparte). */
   _applyBrightness(factor) {
     this.lightsGroup?.traverse((o) => {
@@ -217,13 +269,18 @@ export class WorldRuntime {
    * SOLO de los tramos visibles y cercanos (ahorro de CPU).
    */
   update(dt, elapsed) {
-    const maxDist = Settings.current.drawDistance + 16;
+    // HISTERESIS: entrar y salir a la MISMA distancia hacia que un tramo justo en el limite
+    // se enganchara y desenganchara de la escena en frames alternos, con el tiron que eso
+    // implica. Con dos umbrales separados el cambio ocurre una vez y no oscila.
+    const entrar = Settings.current.drawDistance + 16;
+    const salir  = Settings.current.drawDistance + 26;
     for (const seg of this.segments) {
       const d = seg._center.distanceTo(this._playerPos);
-      const visible = d < maxDist;
-      if (seg.group.visible !== visible) seg.group.visible = visible;
+      const visible = seg.group.visible ? d < salir : d < entrar;
+      this._mostrar(seg, visible);
+      if (!visible) continue;
 
-      if (visible && seg.animated.length) {
+      if (seg.animated.length) {
         for (const obj of seg.animated) obj.userData.tick?.(dt, elapsed);
       }
     }

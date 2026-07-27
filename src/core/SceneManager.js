@@ -12,6 +12,15 @@ export class SceneManager {
   constructor() {
     this.scene = new THREE.Scene();
 
+    // RENDIMIENTO — la escena esta en el origen y NUNCA se mueve, pero por defecto Three
+    // recompone su matriz local en cada frame. El efecto secundario es caro: `updateMatrix()`
+    // marca `matrixWorldNeedsUpdate`, eso pone `force = true` en la raiz y entonces TODOS los
+    // objetos del grafo recalculan su matriz de mundo aunque nada se haya movido (medido:
+    // ~13.900 multiplicaciones de matriz por frame). Congelando la raiz, cada objeto solo
+    // recalcula si el o un ancestro cambiaron de verdad. Medido: -7.5 ms por frame.
+    this.scene.matrixAutoUpdate = false;
+    this.scene.updateMatrix();
+
     const black = new THREE.Color(0x000000);
     this.scene.background = black;
 

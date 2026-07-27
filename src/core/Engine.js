@@ -333,18 +333,7 @@ export class Engine {
     this.postfx = new PostFX(this.renderer.instance, this.scene, this.camera);
 
     await tick();
-    Perf.marca('streaming inicial');
     onStatus('Compilando materiales y sombras…');
-    // Aplica el streaming por distancia UNA vez (oculta los tramos lejanos del spawn) ANTES de
-    // hornear. El horneado de sombras SI se ahorra los tramos ocultos (el pase de sombras corta
-    // en `object.visible === false`). OJO: `compileAsync` NO — recorre la escena entera con
-    // `traverse`, no `traverseVisible`, asi que compila igual los materiales de lo oculto; como
-    // los materiales son COMPARTIDOS (MineMaterials cacheados) eso no añade programas nuevos.
-    try {
-      if (this.world._playerPos && this.world.spawnPoint) this.world._playerPos.copy(this.world.spawnPoint);
-      this.world.update?.(0, 0);
-    } catch { /* no critico */ }
-    Perf.fin();
     await this._prewarm(tick);
 
     Perf.marca('registro en el bucle');
@@ -413,7 +402,10 @@ export class Engine {
     this.scene.updateMatrixWorld(true);
     Perf.censo(this.scene);
 
-    // Mismo destino de render que usara el juego → mismos programas.
+    // 1) COMPILAR con el mapa entero todavia enganchado a la escena. `compileAsync` recorre la
+    //    escena con `traverse`, asi que solo ve lo que cuelga de ella: si primero aplicaramos
+    //    el streaming, los materiales exclusivos de labores lejanas se quedarian sin compilar y
+    //    su shader se pagaria de golpe al llegar alli. Mismo render target que usara el bucle.
     const destino = this.postfx.enabled ? this.postfx.composer.renderTarget1 : null;
     await Perf.medir('prewarm: compileAsync', async () => {
       if (destino) gl.setRenderTarget(destino);
@@ -425,8 +417,17 @@ export class Engine {
     });
     await tick();
 
-    // Un frame completo POR LA RUTA REAL: hornea los shadow maps y, de paso, calienta los
-    // pases de postprocesado (bloom, viñeta, grano), que tambien compilan shaders propios.
+    // 2) Streaming inicial: desengancha de la escena todo lo lejano al spawn. Asi el horneado
+    //    de sombras (8 luces × 6 caras del cubo) solo recorre el entorno del jugador.
+    Perf.marca('prewarm: streaming inicial');
+    try {
+      if (this.world._playerPos && this.world.spawnPoint) this.world._playerPos.copy(this.world.spawnPoint);
+      this.world.update?.(0, 0);
+    } catch { /* no critico */ }
+    Perf.fin();
+
+    // 3) Un frame completo POR LA RUTA REAL: hornea los shadow maps y, de paso, calienta los
+    //    pases de postprocesado (bloom, viñeta, grano), que tambien compilan shaders propios.
     await Perf.medir('prewarm: horneado de sombras', () => {
       gl.shadowMap.needsUpdate = true;
       if (this.postfx.enabled) this.postfx.render(1 / 60);
