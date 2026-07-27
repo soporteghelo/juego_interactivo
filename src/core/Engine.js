@@ -13,11 +13,13 @@ import { InteractionSystem } from './InteractionSystem.js';
 import { HazardSystem } from './HazardSystem.js';
 import { PostFX } from './PostFX.js';
 import { PerfMonitor } from './PerfMonitor.js';
+import { Perf } from './Perf.js';
 
 import { Physics } from '../physics/Physics.js';
 import { LightingRig } from '../lighting/LightingRig.js';
 import { World } from '../world/World.js';
 import { GridWorld } from '../world/grid/GridWorld.js';
+import { CompleteMineWorld } from '../world/complete/CompleteMineWorld.js';
 import { Player } from '../player/Player.js';
 import { BoundsGuard } from '../player/BoundsGuard.js';
 import { GridBoundsGuard } from '../player/GridBoundsGuard.js';
@@ -80,6 +82,10 @@ export class Engine {
       0.1,
       Settings.current.drawDistance + 30
     );
+    Settings.onChange((quality) => {
+      this.camera.far = quality.drawDistance + 30;
+      this.camera.updateProjectionMatrix();
+    });
 
     this.input = new Input(this.renderer.domElement);
     this.input.controlScheme = Device.controlScheme;
@@ -97,18 +103,32 @@ export class Engine {
     // Cede el hilo al navegador entre pasos pesados para que muestre el mensaje de estado.
     const tick = () => new Promise(r => setTimeout(r, 0));
 
+    // El FBX del minero es descarga + parseo: NO depende de nada de aqui. Se lanza YA, en
+    // paralelo, y se espera mas abajo. Mientras el mundo se construye (que cede el hilo cada
+    // ~12 ms) la descarga avanza sola y el parseo se cuela en esos huecos, asi que su coste
+    // deja de sumarse al arranque en vez de pagarse entero al final.
+    const mineroListo = precargarMinero().catch((e) => {
+      console.warn('[Engine] no se pudo precargar el FBX del minero; se usara la persona procedural.', e);
+    });
+
+    Perf.marca('fisica (Rapier WASM)');
     onStatus('Inicializando fisica (Rapier)…');
     this.physics = new Physics();
     await this.physics.init();
 
     await tick();
+    Perf.marca('luces');
     onStatus('Encendiendo luces de mina…');
     this.lighting = new LightingRig({ scene: this.scene, settings: Settings });
 
     await tick();
     const modoGrid = Settings.worldMode === 'grid';
-    onStatus(modoGrid ? 'Trazando el plano de mina (retícula)…' : 'Generando galerias (procedural)…');
-    const WorldClass = modoGrid ? GridWorld : World;
+    const modoCompleto = Settings.worldMode === 'complete';
+    onStatus(modoCompleto
+      ? 'Cargando las 54 labores de la mina completa 3D…'
+      : (modoGrid ? 'Trazando el plano de mina (retícula)…' : 'Generando galerias (procedural)…'));
+    Perf.marca('construccion del mundo');
+    const WorldClass = modoCompleto ? CompleteMineWorld : (modoGrid ? GridWorld : World);
     this.world = new WorldClass({
       scene: this.scene,
       physics: this.physics,
@@ -118,12 +138,15 @@ export class Engine {
       seed: Settings.worldSeed
     });
     await this.world.build((i, total) => {
-      onStatus(`Construyendo galeria ${i} / ${total}…`);
+      onStatus(modoCompleto
+        ? `Construyendo mina completa ${Math.min(i, total)} / ${total}…`
+        : `Construyendo galeria ${i} / ${total}…`);
     });
 
     await tick();
     // Vehiculos: en modo lineal recorren el trazado; en modo grid recorren el circuito de la
     // via principal RN 96 (world.vehicleRoutes).
+    Perf.marca('vehiculos');
     this.vehicleSystem = new VehicleSystem({
       scene: this.scene, world: this.world, bus: this.bus,
       routes: this.world.vehicleRoutes
@@ -131,10 +154,12 @@ export class Engine {
     for (const hz of this.vehicleSystem.hazards) this.world.hazards.push(hz);
 
     await tick();
+    Perf.marca('FBX del minero (espera)');
     onStatus('Cargando modelo del minero (FBX)…');
-    await precargarMinero();   // clona por jugador/NPC; si falla, se usa la persona procedural
+    await mineroListo;   // ya venia cargandose desde el principio; se clona por jugador/NPC
 
     await tick();
+    Perf.marca('jugador + conduccion + peligros');
     onStatus('Equipando al minero…');
     this.player = new Player({
       scene: this.scene,
@@ -178,10 +203,12 @@ export class Engine {
     // Scoop OPERABLE: estacionado cerca del spawn; el jugador se sube con E y lo conduce.
     // En modo retícula el spawn está al sur de la vía principal y el interior queda al NORTE
     // (+Z), así que aparcamos el scoop hacia dentro (+Z) en vez de -Z (que ahí es pared).
-    const scoopPos = this.world.spawnPoint.clone();
-    const scoopYaw = modoGrid ? 0 : Math.PI;
-    if (modoGrid) scoopPos.set(scoopPos.x, 0, scoopPos.z + 12);
-    else scoopPos.set(scoopPos.x + 1.4, 0, scoopPos.z - 10);
+    const scoopPos = this.world.spawnVehiclePoint?.clone?.() || this.world.spawnPoint.clone();
+    const scoopYaw = this.world.spawnVehicleYaw ?? (modoGrid ? 0 : Math.PI);
+    if (!this.world.spawnVehiclePoint) {
+      if (modoGrid) scoopPos.set(scoopPos.x, 0, scoopPos.z + 12);
+      else scoopPos.set(scoopPos.x + 1.4, 0, scoopPos.z - 10);
+    }
     const scoopSpawn = crearScoop();
     scoopSpawn.position.copy(scoopPos);
     scoopSpawn.rotation.y = scoopYaw; // mira hacia dentro de la mina
@@ -260,6 +287,7 @@ export class Engine {
       input: this.input
     });
 
+    Perf.marca('atmosfera (particulas + audio)');
     onStatus('Preparando atmosfera…');
     this.dust = new DustSystem({ scene: this.scene, camera: this.camera, settings: Settings });
     this.mist = new MistSystem({ scene: this.scene, settings: Settings });
@@ -281,6 +309,7 @@ export class Engine {
     this.drips = new DripSystem({ scene: this.scene, settings: Settings, bus: this.bus, audio: this.audio });
 
     await tick();
+    Perf.marca('interfaz + NPC + postFX');
     onStatus('Preparando interfaz…');
     // --- Interfaz: HUD siempre; controles tactiles solo en celular ---
     this.hud = new HUD({ bus: this.bus, container: document.getElementById('ui-layer') });
@@ -304,9 +333,21 @@ export class Engine {
     this.postfx = new PostFX(this.renderer.instance, this.scene, this.camera);
 
     await tick();
+    Perf.marca('streaming inicial');
     onStatus('Compilando materiales y sombras…');
+    // Aplica el streaming por distancia UNA vez (oculta los tramos lejanos del spawn) ANTES de
+    // hornear. El horneado de sombras SI se ahorra los tramos ocultos (el pase de sombras corta
+    // en `object.visible === false`). OJO: `compileAsync` NO — recorre la escena entera con
+    // `traverse`, no `traverseVisible`, asi que compila igual los materiales de lo oculto; como
+    // los materiales son COMPARTIDOS (MineMaterials cacheados) eso no añade programas nuevos.
+    try {
+      if (this.world._playerPos && this.world.spawnPoint) this.world._playerPos.copy(this.world.spawnPoint);
+      this.world.update?.(0, 0);
+    } catch { /* no critico */ }
+    Perf.fin();
     await this._prewarm(tick);
 
+    Perf.marca('registro en el bucle');
     // --- Registro en el bucle ---
     // ORDEN CLAVE: el jugador fija su movimiento cinematico ANTES del step de Rapier.
     this.loop.add(this.player);        // calcula intencion + setNextKinematicTranslation
@@ -338,6 +379,7 @@ export class Engine {
 
     // Arranca el render (la escena se ve detras de la pantalla de inicio).
     this.loop.start();
+    Perf.tabla();
     this.bus.emit('engine:ready');
   }
 
@@ -355,17 +397,41 @@ export class Engine {
    * para compilar en hilos del driver SIN congelar la pagina (antes, un `compile` sincrono
    * bloqueaba el hilo principal varios segundos al iniciar). Cedemos el hilo al navegador
    * antes del horneado de sombras para que la pantalla de carga siga respondiendo.
+   *
+   * CLAVE — hay que precalentar por la MISMA RUTA que usara el bucle. El programa que Three
+   * compila para un material depende del ESPACIO DE COLOR DE SALIDA, y ese cambia segun se
+   * dibuje al lienzo (`srgb`) o a un render target (`srgb-linear`, que es lo que hace el
+   * composer de postprocesado). Compilando contra el lienzo se generaba una familia entera de
+   * shaders que el juego NO usa: se compilaba todo DOS veces y el segundo lote caia de golpe
+   * en el primer frame real — justo al pulsar INGRESAR (el tiron "antes de jugar"). Aqui se
+   * fija el render target del composer antes de compilar y se hornea con un frame del propio
+   * composer, de modo que al arrancar el bucle ya esta TODO compilado y no queda nada por
+   * compilar en caliente.
    */
   async _prewarm(tick = () => Promise.resolve()) {
     const gl = this.renderer.instance;
     this.scene.updateMatrixWorld(true);
-    // Compila los programas de material de todo lo visible (con el conteo de luces final),
-    // sin bloquear el hilo principal.
-    await gl.compileAsync(this.scene, this.camera);
+    Perf.censo(this.scene);
+
+    // Mismo destino de render que usara el juego → mismos programas.
+    const destino = this.postfx.enabled ? this.postfx.composer.renderTarget1 : null;
+    await Perf.medir('prewarm: compileAsync', async () => {
+      if (destino) gl.setRenderTarget(destino);
+      try {
+        await gl.compileAsync(this.scene, this.camera);
+      } finally {
+        if (destino) gl.setRenderTarget(null);
+      }
+    });
     await tick();
-    // Un render completo para hornear los shadow maps, luego los congelamos.
-    gl.shadowMap.needsUpdate = true;
-    gl.render(this.scene, this.camera);
+
+    // Un frame completo POR LA RUTA REAL: hornea los shadow maps y, de paso, calienta los
+    // pases de postprocesado (bloom, viñeta, grano), que tambien compilan shaders propios.
+    await Perf.medir('prewarm: horneado de sombras', () => {
+      gl.shadowMap.needsUpdate = true;
+      if (this.postfx.enabled) this.postfx.render(1 / 60);
+      else gl.render(this.scene, this.camera);
+    });
     gl.shadowMap.autoUpdate = false;
   }
 

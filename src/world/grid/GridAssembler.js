@@ -1,18 +1,17 @@
 import * as THREE from 'three';
 import { GridLayoutGenerator } from './GridLayoutGenerator.js';
-import { NodeSegment } from './NodeSegment.js';
-import { RoomSegment } from './RoomSegment.js';
+import { CsvIntersectionSegment } from './CsvIntersectionSegment.js';
+import { TerminalLaborSegment } from './TerminalLaborSegment.js';
 import { EdgeSegment } from './EdgeSegment.js';
 import { HelicalRampSegment } from './HelicalRampSegment.js';
 import { PropScatter } from '../../procedural/PropScatter.js';
 import { buildSegmentColliders } from '../../physics/Colliders.js';
 import { registerPropSolids } from '../../physics/PropSolids.js';
+import { batchStaticMeshes } from '../../procedural/BatchStatics.js';
 import { crearGuiaRefugio } from '../../elementos/senal/senal.js';
-import { crear as crearChimeneaEscape } from '../../elementos/ssoma/chimenea_escape.js';
-import { DIM, VEHICLE_LOOP, SPAWN_NODE } from './MinePlan.js';
-
-/** Alto de una sala de labor especial (m): holgado para un jumbo/scoop dentro. */
-const ROOM_HEIGHT = 5.5;
+import { DIM, VEHICLE_LOOP, SPAWN_EDGE, SPAWN_NODE } from './MinePlan.js';
+import { Perf } from '../../core/Perf.js';
+import { crearCedente } from '../../utils/Ceder.js';
 
 /**
  * GridAssembler — instancia la retICula del plano: un NodeSegment por interseccion y un
@@ -28,6 +27,23 @@ export class GridAssembler {
     this.rng = rng;
     this.bus = bus;
     this.scatter = new PropScatter(rng);
+    this._batch = { fusionadas: 0, resultantes: 0 };
+  }
+
+  /**
+   * Fusiona las piezas estaticas anonimas del tramo (ver `BatchStatics.js`): cada tablero,
+   * baranda o equipo estacionado son decenas de cajas sueltas y cada una costaba su propia
+   * llamada de dibujo. Nunca debe romper el juego, asi que si algo fallara se sigue con la
+   * jerarquia original.
+   */
+  _fusionar(seg) {
+    try {
+      const r = Perf.acumula('  · fusion de estaticos', () => batchStaticMeshes(seg.group));
+      this._batch.fusionadas += r.fusionadas;
+      this._batch.resultantes += r.resultantes;
+    } catch (e) {
+      console.warn('[GridAssembler] fusion de estaticos omitida en un tramo:', e);
+    }
   }
 
   async assemble(onProgress = () => {}) {
@@ -41,43 +57,58 @@ export class GridAssembler {
     const total = nodes.length + edges.length;
     let done = 0;
 
+    // Cesion por PRESUPUESTO DE TIEMPO en vez de "cada 4 tramos": los tramos cuestan cosas muy
+    // distintas (una interseccion con refugio vale por 20 tuneles cortos), asi que contar tramos
+    // producia bloqueos de 300 ms —la pantalla de carga se veia congelada— alternados con
+    // cesiones inutiles. Con presupuesto, ningun bloqueo pasa de ~12 ms y el progreso avanza fluido.
+    const ceder = crearCedente(12, (hecho) => onProgress(hecho, total));
+
     // ── Nodos (intersecciones y salas) ────────────────────────────────────
     for (const node of nodes) {
       const openDirs = this._openDirs(node, byId);
       let seg;
       let height;
       if (node.kind === 'room') {
-        height = ROOM_HEIGHT;
-        seg = new RoomSegment({
-          size: node.size, height, openDirs,
-          roomType: node.room.type, label: node.room.label, lighting: this.lighting
+        // Ninguna labor terminal se abre como camara. La seccion del acceso que llega al nodo
+        // continua sin ensancharse hasta un frente rocoso ciego; `node.size` pasa a ser solo la
+        // longitud del ultimo tramo, no el ancho de una sala cuadrada.
+        const access = node.edges.find(edge => edge.type === 'access') || node.edges[0];
+        const width = access?.width ?? DIM.access.width;
+        height = access?.height ?? DIM.access.height;
+        seg = new TerminalLaborSegment({
+          width,
+          height,
+          length: node.size,
+          openDirs,
+          roomType: node.room.type,
+          label: node.room.label,
+          lighting: this.lighting,
+          rng: this.rng,
+          wireframeStyle: Boolean(access?.wireframeStyle),
+          // Misma caja que su acceso: la labor no cambia de roca al pasar la boca.
+          variant: access?.variant || null
         });
       } else {
         height = this._nodeHeight(node);
-        seg = new NodeSegment({ size: node.size, height, openDirs, lighting: this.lighting, rng: this.rng });
+        seg = new CsvIntersectionSegment({ size: node.size, height, openDirs, lighting: this.lighting, rng: this.rng });
+        height = seg.height;
       }
-      seg.build();
+      Perf.acumula('  · build() de nodos', () => seg.build());
 
-      // ── CHIMENEAS DE ESCAPE (RB): segunda salida fisica, UNA POR NIVEL (D.S. 024-2016-EM
-      // exige dos vias de salida independientes). c1_r1 = nivel principal; lower_entry = nivel
-      // inferior (su RB sube al principal). En un rincon del cruce, fuera de los carriles.
-      if (node.id === 'c1_r1' || node.id === 'lower_entry') {
-        try {
-          const ch = crearChimeneaEscape({ altura: height });
-          const off = node.size / 2 - 2.4;
-          ch.position.set(-off, 0, -off);
-          ch.rotation.y = Math.atan2(off, off);   // la plataforma mira al centro del cruce
-          seg.group.add(ch);
-          if (ch.userData.interactable) seg.interactables.push(ch.userData.interactable);
-        } catch { /* decorativo: nunca rompe el build */ }
-      }
+      // NOTA: las CHIMENEAS DE ESCAPE (RB) con su jaula de escalines se retiraron del mapa a
+      // peticion — quedaban plantadas en medio del cruce y estorbaban la circulacion. La
+      // señaletica de VIA DE ESCAPE y las guias al refugio Dräger si se conservan.
+      // El elemento sigue disponible en `src/elementos/ssoma/chimenea_escape.js` (visor).
       seg.group.position.set(node.x, node.y, node.z);
       this.scene.add(seg.group);
       seg.group.updateMatrixWorld(true);
 
-      seg.physicsColliders = buildSegmentColliders(this.physics, seg, seg.group.position);
+      Perf.acumula('  · colisionadores', () => { seg.physicsColliders = buildSegmentColliders(this.physics, seg, seg.group.position); });
       // Props SOLIDOS de la sala (refugio Dräger, mobiliario): colision para jugador y NPC.
-      registerPropSolids(this.physics, seg);
+      Perf.acumula('  · props solidos', () => registerPropSolids(this.physics, seg));
+      // Fusion de estaticos: SIEMPRE despues de colisionadores y solidos (esos leen la
+      // jerarquia original de mallas).
+      this._fusionar(seg);
       seg._center = new THREE.Vector3(node.x, node.y + height * 0.5, node.z);
       seg.nodeId = node.id;
 
@@ -85,7 +116,7 @@ export class GridAssembler {
       for (const hz of seg.hazards) hazards.push(hz);
 
       segments.push(seg);
-      if (++done % 4 === 0) { onProgress(done, total); await new Promise(r => setTimeout(r, 0)); }
+      await ceder(++done, total);
     }
 
     // ── Aristas (tuneles) ─────────────────────────────────────────────────
@@ -93,12 +124,12 @@ export class GridAssembler {
       // RAMPA ESPIRAL: la arista con `helix` no es un tunel recto → se instancia como
       // HelicalRampSegment (malla curva) + sus SPANS rectos de colision/contencion.
       if (edge.helix) {
-        done = await this._buildHelixEdge(edge, segments, { done, total, onProgress });
+        done = await this._buildHelixEdge(edge, segments, { done, total, ceder });
         continue;
       }
 
       const seg = new EdgeSegment({ edge, rng: this.rng, lighting: this.lighting });
-      seg.build();
+      Perf.acumula('  · build() de tuneles', () => seg.build());
 
       // Posicion + rotacion: la entrada (z=0 local) queda en el borde del nodo origen y el
       // tunel se extiende (por -Z local) hacia el nodo destino. `pitch` inclina las rampas
@@ -110,12 +141,13 @@ export class GridAssembler {
 
       // Props DESPUES de posicionar/rotar (los interactuables toman su transform de mundo).
       // flags.light = versión aligerada de props (menos malla/relleno) para la retICula.
-      this.scatter.scatter(seg, { light: true });
-      seg.group.updateMatrixWorld(true);
+      Perf.acumula('  · PropScatter', () => this.scatter.scatter(seg, { light: true }));
+      Perf.acumula('  · updateMatrixWorld', () => seg.group.updateMatrixWorld(true));
 
-      seg.physicsColliders = buildSegmentColliders(this.physics, seg, seg.group.position);
+      Perf.acumula('  · colisionadores', () => { seg.physicsColliders = buildSegmentColliders(this.physics, seg, seg.group.position); });
       // Props SOLIDOS del tunel (ventiladores, tableros, estaciones): colision para jugador/NPC.
-      registerPropSolids(this.physics, seg);
+      Perf.acumula('  · props solidos', () => registerPropSolids(this.physics, seg));
+      this._fusionar(seg);
 
       for (const it of seg.interactables) interactables.push(it);
       for (const hz of seg.hazards) hazards.push(hz);
@@ -126,15 +158,19 @@ export class GridAssembler {
       seg._center = mid;
 
       segments.push(seg);
-      if (++done % 4 === 0) { onProgress(done, total); await new Promise(r => setTimeout(r, 0)); }
+      await ceder(++done, total);
     }
 
     // Señalizacion de EVACUACION: guias al refugio Dräger mas cercano en cada interseccion.
-    this._placeRefugeWayfinding(layout, segments);
+    Perf.acumula('  · señalizacion de evacuacion', () => this._placeRefugeWayfinding(layout, segments));
 
     onProgress(total, total);
 
-    const spawnPoint = this._spawn(byId);
+    if (this._batch.fusionadas) {
+      console.info(`[Mina] Estaticos fusionados: ${this._batch.fusionadas} piezas → ${this._batch.resultantes} mallas`);
+    }
+
+    const spawnPoint = this._spawn(byId, edges);
     const vehicleRoutes = this._vehicleRoutes(byId);
 
     return { segments, interactables, hazards, spawnPoint, vehicleRoutes };
@@ -145,12 +181,13 @@ export class GridAssembler {
    * cortos como pseudo-tramos independientes (colision + contencion + piso para conducir). El
    * visual lleva `skipBounds` (no aporta caja de contencion); los spans si.
    */
-  async _buildHelixEdge(edge, segments, { done, total, onProgress }) {
+  async _buildHelixEdge(edge, segments, { done, total, ceder }) {
     const ramp = new HelicalRampSegment({
       helix: edge.helix,
       dim: { width: edge.width, height: edge.height },
       lighting: this.lighting,
-      rng: this.rng
+      rng: this.rng,
+      variant: edge.variant || null
     });
     ramp.build();
     this.scene.add(ramp.group);                 // ya trae su transform en group.position
@@ -162,7 +199,7 @@ export class GridAssembler {
       segments.push(span);
     }
 
-    if ((done += 1) % 4 === 0) { onProgress(done, total); await new Promise(r => setTimeout(r, 0)); }
+    await ceder(++done, total);
     return done;
   }
 
@@ -257,9 +294,14 @@ export class GridAssembler {
         const d = Math.hypot(dx, dz) || 1;
         ux = dx / d; uz = dz / d;
       }
-      // `width`/`height` del tunel que llega: NodeSegment/RoomSegment los usan para sellar
-      // y acampanar la boca (jambas de RockDetail) al ancho REAL de la via.
-      dirs.push({ x: ux, z: uz, width: edge.width, height: edge.height });
+      // `width`/`height`/`archRatio` del tunel que llega: la interseccion los usa para construir
+      // el COLLAR DE BOCA con la herradura EXACTA de esa via (sin ellos queda una rendija
+      // abierta al vacio en la junta) y para sellar/acampanar la boca al ancho real.
+      dirs.push({
+        x: ux, z: uz,
+        width: edge.width, height: edge.height,
+        archRatio: edge.variant?.archRatio ?? 0.40
+      });
     }
     return dirs;
   }
@@ -271,8 +313,38 @@ export class GridAssembler {
     return h;
   }
 
-  /** Punto de aparicion: dentro del nodo de spawn (extremo sur de la via principal). */
-  _spawn(byId) {
+  /** Punto de aparición: dentro del acceso irregular a Frente 2 (lo que anuncia la pantalla de
+   *  inicio "INICIO · FRENTE 2 · LABOR IRREGULAR"). Galeria recta aleatoria y nodo como respaldos. */
+  _spawn(byId, edges) {
+    // PRIMARIO: la labor demostrativa (Frente 2). El jugador arranca al 30% del recorrido desde la
+    // boca — unos 12 m dentro de la labor larga, mirando hacia otros ~29 m de excavación irregular.
+    // Usa el mismo transform YXZ que el ensamblador. Coincide con el rótulo de la pantalla de inicio.
+    const labor = edges.find(edge => edge.id === SPAWN_EDGE && edge.wireframeStyle);
+    if (labor) {
+      const local = new THREE.Vector3(0, 1.4, -labor.length * 0.30);
+      local.applyEuler(new THREE.Euler(labor.pitch || 0, labor.yaw, 0, 'YXZ'));
+      return local.add(new THREE.Vector3(labor.pos.x, labor.pos.y, labor.pos.z));
+    }
+
+    // RESPALDO: una galeria recta cualquiera y un punto interior seguro. Las rampas helicoidales
+    // se excluyen porque su trazado curvo no se puede muestrear como un tunel recto.
+    const candidates = edges.filter(edge => !edge.helix && edge.length > 4 && edge.width > 1.8);
+    if (candidates.length) {
+      const edge = candidates[Math.floor(this.rng.next() * candidates.length)];
+      const sideMargin = 0.8;
+      const endMargin = 2;
+      const halfWidth = Math.max(0, edge.width / 2 - sideMargin);
+      const usableLength = Math.max(0, edge.length - endMargin * 2);
+      const local = new THREE.Vector3(
+        (this.rng.next() * 2 - 1) * halfWidth,
+        1.4,
+        -(endMargin + this.rng.next() * usableLength)
+      );
+      local.applyEuler(new THREE.Euler(edge.pitch || 0, edge.yaw, 0, 'YXZ'));
+      return local.add(new THREE.Vector3(edge.pos.x, edge.pos.y, edge.pos.z));
+    }
+
+    // ÚLTIMO RECURSO: el centro del nodo de spawn.
     const n = byId.get(SPAWN_NODE) || byId.values().next().value;
     return new THREE.Vector3(n.x, 1.4, n.z);
   }
