@@ -47,6 +47,14 @@ El archivo maestro es `prueba/elementos/_mina_completa.csv`; su catálogo de ubi
 es `_mina_completa_layout.csv`. Ambos mantienen la convención topográfica X=Este,
 Y=Norte, Z=cota y una unidad igual a un metro.
 
+> **Las nubes de puntos NO se versionan.** Son 73 MB regenerables, así que están en
+> `.gitignore` (solo se versionan `_catalogo.csv` y `_mina_completa_layout.csv`, que son
+> de autoría). Por eso `dev` y `build` llevan un hook `predev`/`prebuild` que ejecuta
+> `generate:mine` automáticamente: en un clon recién hecho —o en un deploy— el bundle
+> importa `_mina_completa.csv`, y sin el hook la compilación falla con
+> `Could not resolve "../../prueba/elementos/_mina_completa.csv?url"`. La generación
+> tarda ~5 s y es determinista. Los `test:*` sí asumen que ya se ejecutó al menos una vez.
+
 ### Probar en el celular
 
 El `vite.config.js` expone el servidor en la red local (`server.host`). Con el PC y el

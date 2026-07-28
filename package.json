@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --port 5000",
     "dev:visor": "vite --config vite.visor.config.js --port 5001",
+    "predev": "npm run generate:mine",
+    "prebuild": "npm run generate:mine",
     "build": "vite build",
     "build:visor": "node build-visor.mjs",
     "preview": "vite preview",
