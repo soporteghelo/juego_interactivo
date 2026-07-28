@@ -304,20 +304,20 @@ export function crear() {
     const side = px < 0 ? -1 : 1;
     const xo = px + side * 0.14;
     S = pz > 0 ? SneuDel : SneuTra;   // delante del pasador → bastidor articulado
-    const r = cy(WR, WR, 0.48, 20, mGom); put(S, r, xo, GY, pz, 0, 0, Math.PI / 2); // neumatico
-    // Taco (lugs) alrededor de la banda de rodadura
-    for (let i = 0; i < 14; i++) {
+    // RUEDA como GRUPO que gira COMPLETO (neumatico + tacos + rin + pernos) alrededor de su eje X.
+    const w = new THREE.Group(); w.position.set(xo, GY, pz);
+    put(w, cy(WR, WR, 0.48, 20, mGom), 0, 0, 0, 0, 0, Math.PI / 2);   // neumatico
+    for (let i = 0; i < 14; i++) {                                     // taco (lugs)
       const a = (i / 14) * Math.PI * 2;
-      const lug = bx(0.10, 0.06, 0.44, mK);
-      put(S, lug, xo, GY + Math.sin(a) * (WR + 0.01), pz + Math.cos(a) * (WR + 0.01), a, 0, 0);
+      put(w, bx(0.10, 0.06, 0.44, mK), 0, Math.sin(a) * (WR + 0.01), Math.cos(a) * (WR + 0.01), a, 0, 0);
     }
-    put(S, cy(0.32, 0.32, 0.50, 12, mRi), xo, GY, pz, 0, 0, Math.PI / 2); // rin
-    for (let i = 0; i < 6; i++) {                                          // pernos
+    put(w, cy(0.32, 0.32, 0.50, 12, mRi), 0, 0, 0, 0, 0, Math.PI / 2); // rin
+    for (let i = 0; i < 6; i++) {                                       // pernos
       const a = (i / 6) * Math.PI * 2;
-      put(S, cy(0.026, 0.026, 0.07, 6, mK), xo + side * 0.25, GY + Math.sin(a) * 0.18, pz + Math.cos(a) * 0.18, 0, 0, Math.PI / 2);
+      put(w, cy(0.026, 0.026, 0.07, 6, mK), side * 0.25, Math.sin(a) * 0.18, Math.cos(a) * 0.18, 0, 0, Math.PI / 2);
     }
-    put(S, fender(0.82, 0.56, 2.2, mNarD), xo, GY, pz, 0, 0, Math.PI / 2); // guardabarros
-    ruedas.push(r);
+    S.add(w); ruedas.push(w);
+    put(S, fender(0.82, 0.56, 2.2, mNarD), xo, GY, pz, 0, 0, Math.PI / 2); // guardabarros (estatico)
   }
   // Mud flaps de goma detras de las ruedas traseras (explicitamente al sub TRASERO)
   for (const xs of [-1, 1]) put(SneuTra, bx(0.44, 0.42, 0.02, mK), xs * (HW + 0.02), 0.42, -3.10);
@@ -452,9 +452,9 @@ export function crear() {
     // Cilindros de DIRECCION: se estiran/comprimen segun cuanto dobla la junta.
     aim(hydSteer[0], steerBase[0], steerTip[0]);
     aim(hydSteer[1], steerBase[1], steerTip[1]);
-    // Giro de ruedas segun velocidad de avance (radio 0.68 m).
+    // Giro de ruedas segun velocidad de avance (rueda VERTICAL, eje X → rueda alrededor de X).
     const vel = g.userData._speed;
-    if (vel !== 0) for (const r of ruedas) r.rotation.z += (vel / WR) * dt;
+    if (vel !== 0) for (const r of ruedas) r.rotation.x += (vel / WR) * dt;
   };
 
   // hurt (no kill): el contacto con el equipo GOLPEA pero no es fatal.

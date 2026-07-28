@@ -1,0 +1,55 @@
+ID,ARCHIVO,ETIQUETA,TIPO,NIVEL,POS_X,POS_Y,COTA_Z,ROTACION_GRADOS,TRIANGULOS,MIN_X,MAX_X,MIN_Y,MAX_Y,MIN_Z,MAX_Z
+acceso_bocamina,bocamina.csv,Bocamina principal,Acceso,Superficie → Nivel 160,-140,0,20,0,6683,-140.091,-49.999,-2.676,4.724,7.980,25.003
+nivel_160_principal,nivel_principal.csv,Nivel principal 160,Transporte,Nivel 160,-50,2,8,0,19390,-50.097,210.097,-1.322,8.018,6.601,13.523
+interseccion_central,interseccion_4_vias.csv,Intersección central,Intersección,Nivel 160,20,2,8,0,6002,-8.006,48.000,-26.006,30.004,7.458,13.427
+crucero_este,crucero.csv,Crucero de mineral,Crucero,Nivel 160,20,2,8,0,5180,17.289,22.526,1.981,72.006,7.454,12.551
+galeria_estructura,galeria.csv,Galería sobre rumbo,Desarrollo,Nivel 160,20,72,8,0,16301,19.913,240.175,69.028,77.561,6.801,12.571
+acceso_socavon,socavon.csv,Socavón secundario,Acceso,Superficie → Nivel 160,-100,72,8,0,9001,-100.060,20.064,69.401,75.768,7.110,12.507
+cortada_norte,cortada.csv,Cortada norte,Crucero,Nivel 160,115,2,8,0,6494,112.563,117.465,2.000,87.000,7.324,12.550
+bypass_ventilacion,by_pass.csv,By-pass doble de ventilación,Ventilación,Nivel 160,40,-23,8,0,20054,39.959,160.066,-33.066,-11.586,7.133,12.593
+ventana_bypass,ventana.csv,Ventana al by-pass,Conexión,Nivel 160,80,-15.5,8,0,804,77.860,82.148,-15.500,0.500,7.619,12.083
+galeria_hd_sur,galeria_wireframe_simulada.csv,Galería irregular sur,Desarrollo,Nivel 160,40,-30.5,8,-90,14455,37.384,46.795,-150.842,-30.288,7.164,12.549
+frente_avance,frente_desarrollo.csv,Frente de desarrollo,Producción,Nivel 160,210,2,8,0,3287,209.986,246.024,-0.543,4.657,7.511,12.516
+rampa_principal,rampa.csv,Rampa principal −13%,Rampa,Nivel 160 → Nivel 128,210,2,8,-90,20284,207.365,256.613,-22.677,26.621,-23.545,13.102
+subnivel_perforacion,subnivel.csv,Subnivel de perforación,Producción,Nivel 128,234,24,-23.2,0,5740,233.962,314.007,21.850,26.931,-23.817,-19.051
+tajo_longhole,tajo_subniveles.csv,Tajo Sublevel Longhole,Tajo,Nivel 128,285,24,-23.2,0,11648,285.000,321.000,8.000,34.171,-23.741,10.890
+tajo_corte_relleno,tajo_corte_relleno.csv,Tajo corte y relleno,Tajo,Nivel 128,234,72,-23.2,0,1458,234.000,264.000,67.758,76.188,-23.268,-2.926
+tolva_drawpoint,tolva_drawpoint.csv,Tolva y drawpoint,Extracción,Nivel 128,275,-20,-23.2,0,2417,274.990,299.003,-22.469,-17.514,-23.673,-5.179
+chimenea_convencional,chimenea.csv,Chimenea convencional,Vertical,Nivel 128 → Nivel 160,40,72,-52,0,2440,38.278,41.639,70.243,73.691,-52.024,8.020
+chimenea_ventilacion,chimenea_ventilacion.csv,Chimenea raise-bored,Ventilación,Nivel 112 → Nivel 160,120,72,-72,0,3888,118.232,121.776,70.230,73.782,-72.017,8.014
+pique_izaje,pique.csv,Pique de izaje,Vertical,Nivel 48 → Nivel 160,320,2,-112,0,4752,317.223,322.778,-0.778,4.782,-112.016,8.017
+echadero_mineral,echadero_mineral.csv,Echadero de mineral,Extracción,Nivel 128 → Nivel 160,320,24,-52,0,3240,318.252,321.713,22.358,25.711,-52.014,8.011
+slot_raise_produccion,slot_raise.csv,Slot raise,Producción,Nivel 98 → Nivel 128,300,42,-53.2,0,1248,298.892,301.088,40.946,43.059,-53.214,-23.180
+camino_escape,camino_escape.csv,Camino de escape,Seguridad,Nivel 115 → Nivel 160,170,72,-37,0,488,168.461,171.562,70.424,73.535,-37.017,8.010
+camara_carguio,camara_carguio.csv,Cámara de carguío,Infraestructura,Nivel 160,30,72,8,90,1183,26.402,33.640,72.000,98.000,7.572,13.507
+taller_subterraneo,taller_subterraneo.csv,Taller subterráneo,Infraestructura,Nivel 160,70,72,8,90,2305,64.368,75.648,72.000,110.000,7.518,15.483
+estacion_bombeo,estacion_bombeo.csv,Estación de bombeo,Drenaje,Nivel 160,115,72,8,90,1069,110.827,119.171,72.000,96.000,7.563,14.460
+polvorin,polvorin.csv,Polvorín,Infraestructura,Nivel 160,150,72,8,90,1417,146.415,153.664,72.000,102.000,7.564,13.442
+refugio_mineros,refugio_mineros.csv,Refugio minero,Seguridad,Nivel 160,190,72,8,90,947,185.827,194.122,72.000,92.000,7.634,14.045
+estacion_nivel,estacion_nivel.csv,Estación de nivel,Infraestructura,Nivel 160,175,2,8,-90,1525,171.284,178.747,-30.000,2.000,7.547,13.499
+grifo_subterraneo,grifo_subterraneo.csv,Grifo subterráneo,Infraestructura,Nivel 160,10,-30.5,8,-90,1299,5.368,14.748,-58.500,-30.500,7.604,14.491
+subestacion_electrica,subestacion_electrica.csv,Subestación eléctrica,Infraestructura,Nivel 160,55,-30.5,8,-90,1177,51.035,59.031,-54.500,-30.500,7.619,13.967
+sala_chancado,sala_chancado.csv,Sala de chancado,Proceso,Nivel 160,100,-30.5,8,-90,1643,93.947,106.074,-64.500,-30.500,7.543,15.927
+poza_sedimentacion,poza_sedimentacion.csv,Poza de sedimentación,Drenaje,Nivel 160,145,-30.5,8,-90,943,142.035,147.965,-48.500,-30.500,7.573,12.446
+estocada_carguio,estocada_carguio.csv,Estocada de carguío,Producción,Nivel 160,150,2,8,0,493,147.776,152.094,2.000,14.000,7.575,12.129
+nicho_peatonal,nicho_refugio_peatonal.csv,Nicho peatonal,Seguridad,Nivel 160,190,2,8,0,120,188.951,191.034,2.000,3.800,7.908,10.118
+nivel_160_extension_este,nivel_principal.csv,Nivel 160 · extensión este,Transporte,Nivel 160,246,2,8,0,19390,245.903,506.097,-1.322,8.018,6.601,13.523
+crucero_este_2,crucero.csv,Crucero este 2,Crucero,Nivel 160,340,2,8,0,5180,337.289,342.526,1.981,72.006,7.454,12.551
+galeria_este_2,galeria.csv,Galería este 2,Desarrollo,Nivel 160,340,72,8,0,16301,339.913,560.175,69.028,77.561,6.801,12.571
+bypass_este_2,by_pass.csv,By-pass este 2,Ventilación,Nivel 160,300,-23,8,0,20054,299.959,420.066,-33.066,-11.586,7.133,12.593
+ventana_bypass_este,ventana.csv,Ventana by-pass este,Conexión,Nivel 160,340,-15.5,8,0,804,337.860,342.148,-15.500,0.500,7.619,12.083
+rampa_nivel_96,rampa.csv,Rampa al Nivel 96 · −13%,Rampa,Nivel 128 → Nivel 96,314,24,-23.2,-90,20284,311.365,360.613,-0.677,48.621,-54.745,-18.098
+nivel_96_principal,nivel_principal.csv,Nivel principal 96,Transporte,Nivel 96,338,46,-54.4,0,19390,337.903,598.097,42.678,52.018,-55.799,-48.877
+crucero_nivel_96,crucero.csv,Crucero Nivel 96,Crucero,Nivel 96,380,46,-54.4,0,5180,377.289,382.526,45.981,116.006,-54.946,-49.849
+galeria_nivel_96,galeria.csv,Galería sobre rumbo · Nivel 96,Desarrollo,Nivel 96,380,116,-54.4,0,16301,379.913,600.175,113.028,121.561,-55.599,-49.829
+tajo_longhole_nivel_96,tajo_subniveles.csv,Tajo Longhole · Nivel 96,Tajo,Nivel 96,470,116,-54.4,0,11648,470.000,506.000,100.000,126.171,-54.941,-20.310
+refugio_nivel_96,refugio_mineros.csv,Refugio · Nivel 96,Seguridad,Nivel 96,540,116,-54.4,90,947,535.827,544.122,116.000,136.000,-54.766,-48.355
+bombeo_nivel_96,estacion_bombeo.csv,Bombeo · Nivel 96,Drenaje,Nivel 96,570,116,-54.4,90,1069,565.827,574.171,116.000,140.000,-54.837,-47.940
+chimenea_nivel_96_160,chimenea.csv,Chimenea Nivel 96–160,Vertical,Nivel 96 → Nivel 160,500,116,-54.4,0,2440,498.278,501.639,114.243,117.691,-54.424,5.620
+rampa_nivel_64,rampa.csv,Rampa al Nivel 64 · −13%,Rampa,Nivel 96 → Nivel 64,598,46,-54.4,-90,20284,595.365,644.613,21.323,70.621,-85.945,-49.298
+nivel_64_principal,nivel_principal.csv,Nivel principal 64,Transporte,Nivel 64,622,68,-85.6,0,19390,621.903,882.097,64.678,74.018,-86.999,-80.077
+crucero_nivel_64,crucero.csv,Crucero Nivel 64,Crucero,Nivel 64,700,68,-85.6,0,5180,697.289,702.526,67.981,138.006,-86.146,-81.049
+galeria_nivel_64,galeria.csv,Galería sobre rumbo · Nivel 64,Desarrollo,Nivel 64,700,138,-85.6,0,16301,699.913,920.175,135.028,143.561,-86.799,-81.029
+tajo_longhole_nivel_64,tajo_subniveles.csv,Tajo Longhole · Nivel 64,Tajo,Nivel 64,780,138,-85.6,0,11648,780.000,816.000,122.000,148.171,-86.141,-51.510
+camino_escape_nivel_64,camino_escape.csv,Escape profundo · Nivel 64,Seguridad,Nivel 64 → Nivel 96,720,138,-130.6,0,488,718.461,721.562,136.424,139.535,-130.617,-85.590
+pique_profundo,pique.csv,Pique profundo,Vertical,Nivel −56 → Nivel 64,882,68,-205.6,0,4752,879.223,884.778,65.222,70.782,-205.616,-85.583

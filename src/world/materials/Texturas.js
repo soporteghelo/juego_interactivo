@@ -260,6 +260,48 @@ export const texturaOxidoEscurrido = () => crearTextura('oxidoEscurrido', (ctx, 
   }
 }, { repeat: [2, 2] });
 
+/**
+ * MANGA DE VENTILACION en labor. A diferencia del resto de texturas, esta lleva el COLOR
+ * HORNEADO (su material va con `color: 0xffffff`): la manga naranja se ensucia con SALPICADURA
+ * BLANCA DE SHOTCRETE, y una salpicadura blanca no se puede pintar con una textura que solo
+ * multiplica sobre naranja. Incluye ademas la costura helicoidal del ducto y el desgaste.
+ *
+ * El eje V de la TubeGeometry recorre la CIRCUNFERENCIA, asi que las bandas horizontales de
+ * aqui envuelven la manga y las diagonales leen como la espiral del refuerzo.
+ */
+export const texturaManga = () => crearTextura('manga', (ctx, s) => {
+  ctx.fillStyle = '#e84000'; ctx.fillRect(0, 0, s, s);                          // naranja de manga activa
+  // Pliegues/arrugas longitudinales del plastico flexible.
+  for (let i = 0; i < 40; i++) {
+    const y = Math.random() * s;
+    ctx.strokeStyle = `rgba(${Math.random() < 0.5 ? '150,40,0' : '255,120,60'},${0.10 + Math.random() * 0.18})`;
+    ctx.lineWidth = 1 + Math.random() * 3;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(s, y + (Math.random() - 0.5) * 8); ctx.stroke();
+  }
+  // Costura helicoidal del refuerzo (la manga se fabrica en espiral).
+  ctx.strokeStyle = 'rgba(120,35,0,0.35)'; ctx.lineWidth = 4;
+  for (let k = -s; k < s * 2; k += 64) {
+    ctx.beginPath(); ctx.moveTo(k, 0); ctx.lineTo(k + s * 0.45, s); ctx.stroke();
+  }
+  // Suciedad de labor y desgaste.
+  manchas(ctx, s, 45, () => `rgba(${60 + Math.random() * 40 | 0},${35 + Math.random() * 25 | 0},20,${0.10 + Math.random() * 0.20})`, 4, 22);
+  // SALPICADURA DE SHOTCRETE: lo que mas ensucia una manga en labor de sostenimiento. Costras
+  // blancas irregulares, mas densas en la mitad que da a la pared rociada.
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * s, y = Math.random() * s;
+    const r = 2 + Math.random() * 11;
+    ctx.fillStyle = `rgba(${215 + Math.random() * 35 | 0},${212 + Math.random() * 35 | 0},${205 + Math.random() * 30 | 0},${0.45 + Math.random() * 0.5})`;
+    ctx.beginPath();
+    // Costra irregular, no circulo perfecto.
+    for (let a = 0; a < Math.PI * 2; a += 0.5) {
+      const rr = r * (0.6 + Math.random() * 0.7);
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+      a === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+}, { repeat: [1, 1], size: 512 });
+
 /** Goma de neumatico (negro con surcos). */
 export const texturaGoma = () => crearTextura('goma', (ctx, s) => {
   ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0, 0, s, s);

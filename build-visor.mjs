@@ -15,10 +15,9 @@
  *   npm run build:visor
  *   # luego abre visor-standalone.html con doble clic
  *
- * Nota sobre el minero FBX: los 3 elementos `minero_*` bajan un .fbx de
- * /models/*.fbx. Bajo file:// esa peticion la bloquea el navegador, por lo que
- * esos 3 caen automaticamente a su version procedural (persona.js). Los ~90
- * elementos restantes son geometria pura y se ven identicos que en el dev server.
+ * Los modelos FBX del minero tambien se convierten a data URLs y quedan incluidos
+ * dentro del HTML, de modo que el resultado no depende de /models ni de ningun
+ * otro archivo del proyecto.
  */
 
 import esbuild from 'esbuild';
@@ -32,12 +31,44 @@ const raiz      = __dirname;
 const ENTRADA      = resolve(raiz, 'src/visor/visor.js');
 const HTML_FUENTE  = resolve(raiz, 'visor.html');
 const HTML_SALIDA  = resolve(raiz, 'visor-standalone.html');
+const FBX_RUNNING  = resolve(raiz, 'public/models/running.fbx');
+const FBX_WALK     = resolve(raiz, 'public/models/walk.fbx');
 
 // Etiqueta <script> del HTML original que carga el modulo por ruta absoluta.
 const TAG_MODULO = '<script type="module" src="/src/visor/visor.js"></script>';
 
 async function main() {
   console.log('· Empaquetando el visor con esbuild (Three.js incluido)…');
+
+  // FBXLoader puede leer data URLs. Al sustituir las dos rutas durante el bundle,
+  // tanto la malla como las animaciones quedan fisicamente dentro del HTML final.
+  const [runningBytes, walkBytes] = await Promise.all([
+    readFile(FBX_RUNNING),
+    readFile(FBX_WALK)
+  ]);
+  const runningDataUrl = `data:application/octet-stream;base64,${runningBytes.toString('base64')}`;
+  const walkDataUrl = `data:application/octet-stream;base64,${walkBytes.toString('base64')}`;
+
+  const embedFbxPlugin = {
+    name: 'embed-fbx-en-html',
+    setup(build) {
+      build.onLoad({ filter: /[\\/]src[\\/]elementos[\\/]personas[\\/]minero\.js$/ }, async (args) => {
+        let contents = await readFile(args.path, 'utf8');
+        const runningPath = "'/models/running.fbx'";
+        const walkPath = "'/models/walk.fbx'";
+
+        if (!contents.includes(runningPath) || !contents.includes(walkPath)) {
+          throw new Error('No se encontraron las rutas FBX esperadas en minero.js.');
+        }
+
+        contents = contents
+          .replace(runningPath, JSON.stringify(runningDataUrl))
+          .replace(walkPath, JSON.stringify(walkDataUrl));
+
+        return { contents, loader: 'js' };
+      });
+    }
+  };
 
   const bundle = await esbuild.build({
     entryPoints: [ENTRADA],
@@ -48,6 +79,7 @@ async function main() {
     legalComments: 'none',
     write: false,         // queremos el resultado en memoria, no en disco
     logLevel: 'warning',
+    plugins: [embedFbxPlugin],
     define: { 'process.env.NODE_ENV': '"production"' }
   });
 
@@ -56,6 +88,13 @@ async function main() {
   console.log(`· Bundle generado: ${kb} KB de JavaScript.`);
 
   let html = await readFile(HTML_FUENTE, 'utf8');
+
+  // El standalone SI funciona bajo file://, asi que se elimina la guardia que
+  // visor.html muestra en ese protocolo (delimitada por marcadores).
+  html = html.replace(
+    /\/\/ \[FILE_GUARD_START\][\s\S]*?\/\/ \[FILE_GUARD_END\]\n?/,
+    ''
+  );
 
   if (!html.includes(TAG_MODULO)) {
     throw new Error(
@@ -74,7 +113,24 @@ async function main() {
   // Reemplaza la carga externa del modulo por el bundle inline. Se escapa la
   // secuencia </script> por si apareciera dentro de algun string del bundle.
   const inline = `<script type="module">\n${js.replace(/<\/script>/gi, '<\\/script>')}\n</script>`;
-  html = html.replace(TAG_MODULO, inline);
+  // IMPORTANTE: el reemplazo se pasa como FUNCION, no como string. El bundle
+  // minificado contiene secuencias como `$&`, `$'` o `` $` `` que
+  // String.prototype.replace interpretaria como patrones especiales (insertando
+  // la coincidencia, el texto previo/posterior, etc.) y corromperia el JS. Una
+  // funcion devuelve el texto literal, sin interpretar ningun `$`.
+  html = html.replace(TAG_MODULO, () => inline);
+
+  // Verificacion defensiva: el archivo entregable no debe conservar referencias
+  // HTML ni rutas de los dos recursos que acabamos de incorporar.
+  const referenciasExternas = [
+    /<script\b[^>]*\bsrc\s*=/i,
+    /<link\b[^>]*\bhref\s*=/i,
+    /<img\b[^>]*\bsrc\s*=/i,
+    /['"]\/models\/(?:running|walk)\.fbx['"]/i
+  ];
+  if (referenciasExternas.some((patron) => patron.test(html))) {
+    throw new Error('El HTML generado todavia contiene una dependencia externa.');
+  }
 
   // Aviso visible en el <title> y un comentario para dejar claro que es generado.
   html = html.replace(

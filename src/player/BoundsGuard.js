@@ -19,6 +19,7 @@
 export class BoundsGuard {
   /** @param {{player:object, world:object}} deps */
   constructor({ player, world }) {
+    this.player = player;
     this.controller = player.controller;
     this.world = world;
 
@@ -63,7 +64,8 @@ export class BoundsGuard {
     }
 
     // Fuera del gabarito (o mas alla de los extremos del mapa): restaurar.
-    this.controller.teleport(this._safe);
+    this.player.teleport?.(this._safe);
+    if (!this.player.teleport) this.controller.teleport(this._safe);
   }
 
   /**

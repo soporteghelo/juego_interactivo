@@ -1,0 +1,35 @@
+ARCHIVO,TIPO,DIMENSIONES,ESCALA,UNIDAD,EJE_VERTICAL,REFERENCIA,TRIANGULOS,MIN_X,MAX_X,MIN_Y,MAX_Y,MIN_Z,MAX_Z
+bocamina.csv,acceso_superficie,90 m; 5.0 x 5.0 m; -13.0%; cuneta 0.40 x 0.35 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,6710,5999.909,6090.001,4497.324,4504.724,-34.020,-16.997
+galeria.csv,desarrollo_sobre_rumbo,220 m; 4.5 x 4.5 m; -0.4%; cuneta 0.40 x 0.35 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,16328,5999.913,6220.175,4497.028,4505.561,-221.199,-215.429
+galeria_wireframe_simulada.csv,desarrollo_alta_densidad,120 m; 4.5 x 4.5 m; -0.4%; detalle longitudinal 1.2 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,14482,5999.788,6120.342,4497.384,4506.795,-220.836,-215.451
+crucero.csv,desarrollo_transversal,70 m; 4.5 x 4.5 m; -0.3%; boca reforzada,1:1,m,Z,.claude/commands/mina-3d-trackless.md,5234,5997.289,6002.526,4499.981,4570.006,-220.546,-215.449
+rampa.csv,rampa_principal_helicoidal,240 m; 5.0 x 5.0 m; -13.0%; radio 22 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,20338,5975.379,6024.677,4497.365,4546.613,-251.545,-214.898
+subnivel.csv,perforacion_longhole,80 m; 4.0 x 4.0 m; -0.3%; intervalo vertical 15-30 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,5794,5999.962,6080.007,4497.850,4502.931,-220.617,-215.851
+nivel_principal.csv,transporte_principal,260 m; 6.5 x 5.5 m; -0.4%; galibo peatonal 0.90 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,19444,5999.903,6260.097,4496.678,4506.018,-221.399,-214.477
+frente_desarrollo.csv,frente_ciego,36 m; 4.5 x 4.5 m; -0.4%; avance 3-4 m/disparo,1:1,m,Z,.claude/commands/mina-3d-trackless.md,3314,5999.986,6036.024,4497.457,4502.657,-220.489,-215.484
+camara_carguio.csv,estacion_carguio,26 m; hasta 7.0 x 5.5 m; ensanche de maniobra,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1210,6000.000,6026.000,4496.360,4503.598,-220.428,-214.493
+taller_subterraneo.csv,infraestructura,38 m; hasta 11.0 x 7.5 m; cámara trackless,1:1,m,Z,.claude/commands/mina-3d-trackless.md,2332,6000.000,6038.000,4494.352,4505.632,-220.482,-212.517
+estacion_bombeo.csv,infraestructura_drenaje,24 m; hasta 8.0 x 6.5 m; punto bajo de bombeo,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1096,6000.000,6024.000,4495.829,4504.173,-220.437,-213.540
+polvorin.csv,infraestructura_restringida,30 m; hasta 7.0 x 5.5 m; ventilado y aislado,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1444,6000.000,6030.000,4496.336,4503.585,-220.436,-214.558
+refugio_mineros.csv,refugio_minero_sellado,20 m; hasta 8.0 x 6.0 m; cámara de emergencia,1:1,m,Z,.claude/commands/mina-3d-trackless.md,974,6000.000,6020.000,4495.878,4504.173,-220.366,-213.955
+socavon.csv,acceso_horizontal_superficie,120 m; 5.0 x 4.5 m; -0.4%,1:1,m,Z,.claude/commands/mina-3d-trackless.md,9028,5999.940,6120.064,4497.401,4503.768,-18.890,-13.493
+cortada.csv,desarrollo_en_esteril,85 m; 4.5 x 4.5 m; -0.4%,1:1,m,Z,.claude/commands/mina-3d-trackless.md,6548,5997.563,6002.465,4500.000,4585.000,-220.676,-215.450
+ventana.csv,conexion_corta,16 m; 4.0 x 4.0 m; bypass-galería,1:1,m,Z,.claude/commands/mina-3d-trackless.md,858,5997.860,6002.148,4500.000,4516.000,-220.381,-215.917
+estocada_carguio.csv,labor_corta_ciega,12 m; 4.0 x 4.0 m; carguío/volteo,1:1,m,Z,.claude/commands/mina-3d-trackless.md,520,5997.776,6002.094,4500.000,4512.000,-220.425,-215.871
+nicho_refugio_peatonal.csv,refugio_peatonal,1.8 m profundidad; 2.0 x 2.0 m; cada ~30 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,144,5998.951,6001.034,4500.000,4501.800,-220.092,-217.882
+estacion_nivel.csv,ensanche_rampa_nivel,32 m; hasta 7.0 x 5.5 m; cruce de equipos,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1552,6000.000,6032.000,4496.284,4503.747,-220.453,-214.501
+grifo_subterraneo.csv,despacho_combustible,28 m; hasta 9.0 x 6.5 m; berma de contención,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1326,6000.000,6028.000,4495.368,4504.748,-220.396,-213.509
+subestacion_electrica.csv,infraestructura_electrica,24 m; hasta 8.0 x 6.0 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1204,6000.000,6024.000,4496.035,4504.031,-220.381,-214.033
+sala_chancado.csv,infraestructura_proceso,34 m; hasta 12.0 x 8.0 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1670,6000.000,6034.000,4493.947,4506.074,-220.457,-212.073
+poza_sedimentacion.csv,drenaje,18 m; hasta 6.0 x 4.5 m; punto bajo,1:1,m,Z,.claude/commands/mina-3d-trackless.md,970,6000.000,6018.000,4497.035,4502.965,-220.427,-215.554
+chimenea.csv,conexion_vertical,60 m; diámetro 3.0 m; convencional irregular,1:1,m,Z,.claude/commands/mina-3d-trackless.md,2440,5998.278,6001.639,4498.243,4501.691,-220.024,-159.980
+chimenea_ventilacion.csv,ventilacion_raise_bore,80 m; diámetro 3.5 m; raise-bored,1:1,m,Z,.claude/commands/mina-3d-trackless.md,3888,5998.232,6001.776,4498.230,4501.782,-220.017,-139.986
+pique.csv,acceso_vertical_izaje,120 m; diámetro 5.5 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,4752,5997.223,6002.778,4497.222,4502.782,-320.016,-199.983
+echadero_mineral.csv,manejo_mineral,60 m; diámetro 3.0 m; ore pass vertical,1:1,m,Z,.claude/commands/mina-3d-trackless.md,3240,5998.252,6001.713,4498.358,4501.711,-220.014,-159.989
+slot_raise.csv,chimenea_corte_longhole,30 m; diámetro 2.0 m; cara libre inicial,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1248,5998.892,6001.088,4498.946,4501.059,-220.014,-189.980
+camino_escape.csv,escape_personal,45 m; sección cuadrada 3.0 x 3.0 m; escaleras/plataformas,1:1,m,Z,.claude/commands/mina-3d-trackless.md,488,5998.461,6001.562,4498.424,4501.535,-220.017,-174.990
+by_pass.csv,bypass_doble_ventilacion,2 x 120 m; 5.0 x 4.5 m; separación 15 m; 3 ventanas,1:1,m,Z,.claude/commands/mina-3d-trackless.md,20162,5999.959,6120.066,4489.934,4511.414,-220.867,-215.407
+tajo_subniveles.csv,sublevel_longhole_stoping,tajeo 36 x 14 x 30 m; slot 2.0 m; 3 drawpoints; subniveles cada 15 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,11648,6000.000,6036.000,4484.000,4510.171,-220.541,-185.910
+tajo_corte_relleno.csv,tajo_tabular,30 x 8 x 20 m; dentro de rango 5-20 x 15-40 x 15-40 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,1476,6000.000,6030.000,4495.758,4504.188,-220.068,-199.726
+interseccion_4_vias.csv,conexion_reforzada,galerías 4.5 x 4.5 m; zona central +20% = 5.4 x 5.4 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,6164,5971.994,6028.000,4471.994,4528.004,-220.542,-214.573
+tolva_drawpoint.csv,extraccion,acceso 24 m; 4.5 x 4.5 m; campana 15 m; diámetro 3.0-4.5 m,1:1,m,Z,.claude/commands/mina-3d-trackless.md,2444,5999.990,6024.003,4497.531,4502.486,-220.473,-201.979

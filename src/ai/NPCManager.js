@@ -59,13 +59,13 @@ export class NPCManager {
     // rampas inclinadas (un NPC patrullando una pendiente flotaria/clipearia). En el mundo
     // lineal ningun tramo tiene esos tipos → la lista queda igual que `segs` (sin cambio).
     const candidatos = segs.filter(s =>
-      s.type !== 'node' && s.type !== 'room' && s.type !== 'access' && !(s.edge && s.edge.pitch)
+      s.type !== 'node' && s.type !== 'room' && s.type !== 'access' && !s.vertical && !(s.edge && s.edge.pitch)
     );
     if (!candidatos.length) return;
 
     // Reparto: el lineal conserva el paso historico (tramos 1,3,5,7 cerca del inicio);
     // la retICula reparte los NPCs por TODO el mapa.
-    const esGrid = segs.some(s => s.type === 'node');
+    const esGrid = segs.some(s => s.type === 'node' || s.completeMine);
     const paso = esGrid ? Math.max(2, Math.floor(candidatos.length / maxNpc)) : 2;
 
     let placed = 0;
@@ -75,16 +75,23 @@ export class NPCManager {
       // Sobre la BERMA peatonal demarcada (si el tramo la tiene) → el NPC camina EXACTAMENTE por
       // la línea señalizada. Si no, a un costado del eje (fallback histórico).
       const enBerma = seg.bermLocalX != null;
-      const laneX = enBerma ? seg.bermLocalX : (placed % 2 ? 1.2 : -1.2);
-      const pos = new THREE.Vector3(laneX, 0, -seg.length / 2)
-        .applyMatrix4(seg.group.matrixWorld);
-      // Eje del tunel en mundo (local -Z): la patrulla recorre el tunel, no un eje fijo.
-      const eje = new THREE.Vector3(0, 0, -1).applyQuaternion(seg.group.quaternion);
+      let pos;
+      let eje;
+      if (seg.navigationAnchor && seg.navigationAxis) {
+        eje = seg.navigationAxis.clone().normalize();
+        const lateral = new THREE.Vector3(eje.z, 0, -eje.x);
+        pos = seg.navigationAnchor.clone().addScaledVector(lateral, placed % 2 ? 0.8 : -0.8);
+        if (this._boundsCheck && !this._boundsCheck(pos)) pos.copy(seg.navigationAnchor);
+      } else {
+        const laneX = enBerma ? seg.bermLocalX : (placed % 2 ? 1.2 : -1.2);
+        pos = new THREE.Vector3(laneX, 0, -seg.length / 2).applyMatrix4(seg.group.matrixWorld);
+        eje = new THREE.Vector3(0, 0, -1).applyQuaternion(seg.group.quaternion);
+      }
       const npc = new NPC({
         role: roles[placed % roles.length],
         position: pos,
         behavior: placed % 2 ? 'patrol' : 'idle',
-        patrolRange: 5,
+        patrolRange: seg.patrolRange ?? 5,
         patrolAxis: eje,
         boundsCheck: this._boundsCheck,
         blockedCheck: this._blockedCheck,

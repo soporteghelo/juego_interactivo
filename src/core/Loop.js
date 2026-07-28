@@ -15,6 +15,7 @@ export class Loop {
     this._running = false;
 
     this._fixedDt = 1 / 60;       // 60 Hz de simulacion
+    this._maxFixedSteps = 3;      // evita espiral de fisica cuando cae el framerate
     this._accumulator = 0;
     this._maxAccum = 0.2;         // evita "espiral de la muerte" si la pestana se congela
     this._last = 0;
@@ -51,10 +52,15 @@ export class Loop {
 
     // --- Paso fijo de simulacion ---
     this._accumulator += dt;
-    while (this._accumulator >= this._fixedDt) {
+    let fixedSteps = 0;
+    while (this._accumulator >= this._fixedDt && fixedSteps < this._maxFixedSteps) {
       for (const s of this._systems) s.fixedUpdate?.(this._fixedDt);
       this._accumulator -= this._fixedDt;
+      fixedSteps++;
     }
+    // Si el render estuvo bloqueado, descarta deuda antigua. Intentar recuperar 8-12 pasos
+    // Rapier en un cuadro generaba otro cuadro lento y mantenia el juego en un ciclo de lag.
+    if (this._accumulator >= this._fixedDt) this._accumulator %= this._fixedDt;
 
     // --- Paso variable de presentacion ---
     for (const s of this._systems) s.update?.(dt, this._elapsed);

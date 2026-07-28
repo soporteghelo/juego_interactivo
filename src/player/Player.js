@@ -24,13 +24,15 @@ export class Player {
     this.rig = new CameraRig(camera);
     this.headlamp = new Headlamp(camera, scene, bus);
 
-    this.walkSpeed = 3.2;
-    this.runSpeed = 5.8;
-    this.crouchSpeed = 1.7;
+    this.walkSpeed = 3.0;
+    this.runSpeed = 4.6;
+    this.crouchSpeed = 1.5;
 
     this._forward = new THREE.Vector3();
     this._right = new THREE.Vector3();
     this._move = new THREE.Vector3();
+    this._velocity = new THREE.Vector3();
+    this._step = new THREE.Vector3();
     this._lastEmit = 0;
     this._phase = 0; // fase de la marcha del avatar
 
@@ -39,6 +41,14 @@ export class Player {
 
   get position() {
     return this.controller.position;
+  }
+
+  /** Reubica al jugador sin conservar velocidad horizontal de la posicion anterior. */
+  teleport(position) {
+    this._velocity.set(0, 0, 0);
+    this._move.set(0, 0, 0);
+    this.controller.teleport(position);
+    this._avatarLast = null;
   }
 
   _buildMinerMesh() {
@@ -52,6 +62,7 @@ export class Player {
   // --- Simulacion (paso fijo): movimiento y colision ---
   fixedUpdate(dt) {
     if (!this.input.enabled) {
+      this._velocity.set(0, 0, 0);
       this.controller.move(this._move.set(0, 0, 0), dt); // solo gravedad
       return;
     }
@@ -72,11 +83,14 @@ export class Player {
         ? this.runSpeed
         : this.walkSpeed;
 
-    this._move.multiplyScalar(speed * dt);
+    this._move.multiplyScalar(speed);
+    const response = this._move.lengthSq() > 1e-5 ? 5.0 : 9.0;
+    this._velocity.lerp(this._move, 1 - Math.exp(-response * dt));
+    if (this._velocity.lengthSq() < 1e-5) this._velocity.set(0, 0, 0);
 
     if (this.input.consumePressed('jump')) this.controller.jump();
 
-    this.controller.move(this._move, dt);
+    this.controller.move(this._step.copy(this._velocity).multiplyScalar(dt), dt);
   }
 
   // --- Presentacion (paso variable): camara, linterna, avatar ---

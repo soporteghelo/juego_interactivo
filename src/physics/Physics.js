@@ -47,6 +47,25 @@ export class Physics {
     return this.world.createCollider(colDesc, body);
   }
 
+  /**
+   * Crea un colisionador estatico a partir de una malla triangular en coordenadas mundo.
+   * Se usa para la mina topografica completa: sus rampas, hastiales y pisos irregulares no
+   * pueden representarse fielmente mediante cajas.
+   */
+  addStaticTrimesh({ vertices, indices }) {
+    if (!(vertices instanceof Float32Array) || vertices.length < 9) return null;
+    const triangleIndices = indices instanceof Uint32Array
+      ? indices
+      : Uint32Array.from(indices || { length: vertices.length / 3 }, (_, index) => index);
+    const body = this.world.createRigidBody(this.RAPIER.RigidBodyDesc.fixed());
+    // Evita que la capsula "tropiece" con las diagonales internas entre triangulos coplanares.
+    // En una malla topografica densa esas aristas provocaban vibracion y picos de CPU al
+    // caminar rozando el hastial.
+    const flags = this.RAPIER.TriMeshFlags?.FIX_INTERNAL_EDGES;
+    const desc = this.RAPIER.ColliderDesc.trimesh(vertices, triangleIndices, flags);
+    return this.world.createCollider(desc, body);
+  }
+
   /** Elimina un colisionador estatico (al descargar un tramo lejano). */
   removeCollider(collider) {
     if (collider && this.world) {
@@ -68,14 +87,19 @@ export class Physics {
     );
     const body = this.world.createRigidBody(bodyDesc);
 
-    const colDesc = this.RAPIER.ColliderDesc.capsule(halfHeight, radius);
+    // Sensor: mantiene presencia fisica consultable sin convertir un NPC detenido en una
+    // barrera invisible que cierre por completo una labor angosta.
+    const colDesc = this.RAPIER.ColliderDesc.capsule(halfHeight, radius).setSensor(true);
     const collider = this.world.createCollider(colDesc, body);
 
     const controller = this.world.createCharacterController(0.05); // offset 5cm: más estable en esquinas
-    controller.enableAutostep(0.45, 0.20, true);  // sube escalones/aristas hasta 45 cm
-    controller.enableSnapToGround(0.50);          // se pega al piso en rampas/costuras
-    controller.setApplyImpulsesToDynamicBodies(true);
-    controller.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
+    // El CSV tiene pisos superpuestos en algunos empalmes. Un autostep/snap demasiado grande
+    // hacia saltar la capsula entre superficies y se percibia como aceleracion o lag.
+    controller.enableAutostep(0.28, 0.28, false);
+    controller.enableSnapToGround(0.25);
+    controller.setApplyImpulsesToDynamicBodies(false);
+    controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
+    controller.setSlideEnabled?.(true);
 
     return { body, collider, controller };
   }

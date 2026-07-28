@@ -60,3 +60,36 @@ export function crear({ sobresalido = false } = {}) {
   mesh.name = sobresalido ? 'perno_sobresalido' : 'perno';
   return mesh;
 }
+
+// ── TAG DE IDENTIFICACION del perno ────────────────────────────────────────────
+// Plaquita de color colgada en la cabeza del perno. En la operacion real codifica longitud del
+// perno y campaña/fecha de instalacion, y es el control de calidad del sostenimiento: una
+// hilera de puntos de color a lo largo de la labor. En la oscuridad son retro-reflectivos, asi
+// que devuelven el headlamp y son de lo primero que se ve al alumbrar el hastial.
+
+/** Paleta de tags observada en labor: azul, verde, blanco y naranja. */
+export const COLORES_TAG = [0x2ea3ff, 0x35d06a, 0xeef2f5, 0xff8a1e];
+
+let _tagGeo = null, _tagMat = null;
+
+/** Geometria del tag (compartida: se instancia por miles con `instanceColor`). */
+export function geometriaTag() {
+  if (!_tagGeo) {
+    _tagGeo = new THREE.BoxGeometry(0.052, 0.075, 0.005);
+    _tagGeo.translate(0, 0, 0.003);
+  }
+  return _tagGeo;
+}
+
+/**
+ * Material del tag. Base BLANCA a proposito: `InstancedMesh.instanceColor` multiplica sobre el
+ * difuso, asi que el blanco deja que cada instancia tome su color exacto de la paleta. Rugosidad
+ * baja + env-map alto = brillo retro-reflectivo bajo el headlamp, sin emisivo (no debe "arder"
+ * en el bloom como un LED).
+ */
+export function materialTag() {
+  if (!_tagMat) _tagMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, roughness: 0.28, metalness: 0.1, envMapIntensity: 1.1
+  });
+  return _tagMat;
+}

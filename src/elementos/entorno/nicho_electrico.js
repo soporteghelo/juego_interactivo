@@ -191,14 +191,15 @@ function planoRocaTerrain(w, h, segsX = 24, segsY = 20, amp = 0.18, scale = 2.8,
  *   irregular:   false → amplifica el relieve fBm y la silueta del borde (excavación mas tosca).
  * @returns {THREE.Group}
  */
-export function crear({ doble = false, conTableros = true, seed = 1, conLuz = true, irregular = false } = {}) {
+export function crear({ doble = false, conTableros = true, seed = 1, conLuz = true, irregular = false, w, h, d } = {}) {
   const g = new THREE.Group();
   g.name = conTableros ? 'nicho_electrico' : 'nicho_vacio';
 
   // ── Dimensiones ─────────────────────────────────────────────────
-  const W = doble ? 2.10 : 1.55;
-  const H = 2.30;
-  const D = 1.55;
+  // w/h/d overridean el tamaño (el refugio peatonal los pasa mas grandes para caber dentro).
+  const W = w ?? (doble ? 2.10 : 1.55);
+  const H = h ?? 2.30;
+  const D = d ?? 1.55;
 
   // Multiplicadores de irregularidad: el refugio peatonal se ve mas "roto" que un nicho
   // electrico prolijo → mas amplitud de relieve (aM) y mas perturbacion de silueta (eM).
@@ -355,7 +356,8 @@ export function crear({ doble = false, conTableros = true, seed = 1, conLuz = tr
   return g;
 }
 
-/** Alias para el nicho vacío (refugio peatonal sin equipos): sin foco y con forma mas irregular. */
-export function crearVacio({ seed = 1 } = {}) {
-  return crear({ doble: false, conTableros: false, seed, conLuz: false, irregular: true });
+/** Alias para el nicho vacío (refugio peatonal sin equipos): sin foco y con forma mas irregular.
+ *  w/h/d permiten agrandarlo para que el jugador se refugie comodo dentro. */
+export function crearVacio({ seed = 1, w, h, d } = {}) {
+  return crear({ doble: false, conTableros: false, seed, conLuz: false, irregular: true, w, h, d });
 }

@@ -1,6 +1,6 @@
 import {
   ROWS, COLS, SPACING_X, SPACING_Z, LEVEL_DROP, DIM, NODE_SIZE, ROOM_SIZE, SPUR_DIST,
-  HOLES, LOWER, RAMP_HELIX, SPURS, VARIETY
+  HOLES, DECLINES, SPURS, VARIETY, ANCHO_MINIMO_LABOR, ANCHO_PASO_INTERSECCION
 } from './MinePlan.js';
 
 /** Vectores de direccion cardinal en el plano XZ (N=+Z norte, S=-Z, E=+X, W=-X). */
@@ -65,11 +65,13 @@ export class GridLayoutGenerator {
       }
     }
 
-    // ── RAMPA ESPIRAL: baja al nivel inferior y CREA su nodo de llegada ─────
-    this._buildHelix();
-
-    // ── Nivel inferior (cuelga del nodo de llegada de la rampa espiral) ─────
-    this._buildLower();
+    // ── RAMPAS ESPIRALES + niveles inferiores (una o varias bajadas) ───────
+    // Se construyen EN ORDEN: cada helice arranca de un nodo del nivel anterior (que ya existe),
+    // luego cuelga su sub-grid. Asi la 2ª rampa puede salir del nivel 1 hacia el nivel 2.
+    for (const d of DECLINES) {
+      this._buildHelix(d.helix);
+      this._buildLower(d.lower);
+    }
 
     // ── Labores especiales en fondo de saco (spurs) ────────────────────────
     for (const sp of SPURS) {
@@ -77,15 +79,19 @@ export class GridLayoutGenerator {
       if (!parent) continue;
       const d = DIRS[sp.dir];
       const roomId = `spur_${sp.type}_${sp.from}`;
+      const spurDistance = sp.distance ?? SPUR_DIST;
       this._addNode({
         id: roomId,
         // coloca la sala a SPUR_DIST del padre en la direccion pedida (mismo nivel).
-        x: parent.x + d.x * SPUR_DIST,
-        z: parent.z + d.z * SPUR_DIST, // N (d.z=+1) => hacia +Z (norte)
+        x: parent.x + d.x * spurDistance,
+        z: parent.z + d.z * spurDistance, // N (d.z=+1) => hacia +Z (norte)
         y: parent.y,
         size: ROOM_SIZE, kind: 'room', room: { type: sp.type, label: sp.label }
       });
-      this._makeEdge(sp.from, roomId, { type: 'access', label: sp.label, main: false });
+      // Los accesos a labores activas usan la sección facetada/irregular del wireframe de
+      // referencia. Refugios, talleres y servicios conservan una excavación más regular.
+      const wireframeStyle = sp.wireframeStyle ?? ['frente', 'sostenimiento', 'desatado', 'disparado', 'camara', 'shotcrete'].includes(sp.type);
+      this._makeEdge(sp.from, roomId, { type: 'access', label: sp.label, main: false, wireframeStyle });
     }
 
     this._validateComplete();
@@ -118,6 +124,39 @@ export class GridLayoutGenerator {
     return set;
   }
 
+  /**
+   * VARIANTE DE CAJA de una labor: lo que hace que recorrer la mina NO se sienta repetido.
+   * Cada arista saca de la semilla su tipo de roca (rampa de color de la carcasa), la forma de
+   * la herradura, cuanto shotcrete lleva, como esta labrada la cuneta, cuanta roca suelta hay y
+   * que tan irregular/desatable quedo la corona. Todo es determinista por semilla.
+   */
+  _sectionVariant(type) {
+    if (!this.rng) {
+      return {
+        rockType: 'caliza', archRatio: 0.40, shotcrete: type === 'crucero',
+        cuneta: 'ambas', debris: 1, crownRough: 0.5, sueltas: 0.35
+      };
+    }
+    const rockTypes = VARIETY.rockTypes;
+    const cunetaModes = VARIETY.cunetaModes;
+    return {
+      // Tipo de roca de la caja (color por vertice de la carcasa).
+      rockType: rockTypes[this.rng.int(0, rockTypes.length - 1)],
+      // Forma de la herradura: de casi rectangular (0.30) a arco de medio punto (0.52).
+      archRatio: +(0.30 + this.rng.next() * 0.22).toFixed(3),
+      // Sostenimiento: unas labores en roca expuesta, otras revestidas con shotcrete.
+      shotcrete: this.rng.next() < (VARIETY.shotcreteChance[type] ?? 0.4),
+      // Cuneta labrada: a ambos lados, a uno solo, o labor sin cuneta (drenaje por el piso).
+      cuneta: cunetaModes[this.rng.int(0, cunetaModes.length - 1)],
+      // Cuanta roca suelta / escombro hay tirado (0.4 = limpia, 2.0 = sin limpiar tras el disparo).
+      debris: +(0.4 + this.rng.next() * 1.6).toFixed(2),
+      // Rugosidad de la CORONA (sobre-excavacion del techo): 0 = perfilada, 1 = muy quebrada.
+      crownRough: +this.rng.next().toFixed(3),
+      // Probabilidad de que la labor tenga roca/shotcrete a punto de desprenderse en la corona.
+      sueltas: +this.rng.next().toFixed(3)
+    };
+  }
+
   // ── RAMPA ESPIRAL ──────────────────────────────────────────────────────────
 
   /**
@@ -126,8 +165,7 @@ export class GridLayoutGenerator {
    * la salida del helicoide (nivel inferior), y añade una arista de grafo con los parametros del
    * helicoide (`edge.helix`) que el GridAssembler instancia como `HelicalRampSegment`.
    */
-  _buildHelix() {
-    const H = RAMP_HELIX;
+  _buildHelix(H) {
     const from = this.byId.get(H.from);
     if (!from) return;
 
@@ -172,6 +210,7 @@ export class GridLayoutGenerator {
       // El helicoide no arranca en linea recta hacia el otro nodo → dirs de boca explicitas.
       dirA: { x: dir.x, z: dir.z },
       dirB: { x: -tx, z: -tz },
+      variant: this._sectionVariant('ramp'),
       helix: {
         axis: { x: ax, z: az }, topY: from.y,
         radius: H.radius, startAngle, totalAngle: total, drop: H.drop, label: H.label
@@ -183,7 +222,7 @@ export class GridLayoutGenerator {
   }
 
   /** Nivel inferior: nodos por offset (dx,dz) desde el nodo de llegada + sus aristas. */
-  _buildLower() {
+  _buildLower(LOWER) {
     const entry = this.byId.get(LOWER.entry);
     if (!entry) return;
     for (const n of LOWER.nodes) {
@@ -228,7 +267,7 @@ export class GridLayoutGenerator {
   }
 
   /** Construye una arista entre dos nodos (soporta desnivel → rampa inclinada). */
-  _makeEdge(aId, bId, { type, label, main }) {
+  _makeEdge(aId, bId, { type, label, main, wireframeStyle = false }) {
     const a = this.byId.get(aId);
     const b = this.byId.get(bId);
 
@@ -253,19 +292,21 @@ export class GridLayoutGenerator {
     if (this.rng && VARIETY.sectionJitter && (type === 'gallery' || type === 'crucero')) {
       width  = +(width  * (1 + (this.rng.next() * 2 - 1) * VARIETY.sectionJitter)).toFixed(3);
       height = +(height * (1 + (this.rng.next() * 2 - 1) * VARIETY.sectionJitter)).toFixed(3);
-      // ACOTA la seccion: minimo transitable y maximo < BOCA del cruce. Con NODE_SIZE=10 y
-      // POST_T≈1.4 la jamba de NodeSegment acampana hasta w≈6.5 m; por encima quedaria un hueco
-      // en la union tunel→cruce. Asi el jitter da variedad SIN romper las bocas.
-      width  = Math.max(3.6, Math.min(6.4, width));
-      height = Math.max(3.8, Math.min(5.6, height));
+      // ACOTA la seccion: el minimo garantiza que el peaton siga pasando por el costado del
+      // scoop (ANCHO_MINIMO_LABOR) y el maximo iguala la BOCA del cruce (ANCHO_PASO_INTERSECCION):
+      // por encima el tunel seria mas ancho que la interseccion y se veria un escalon en la union.
+      width  = Math.max(ANCHO_MINIMO_LABOR, Math.min(ANCHO_PASO_INTERSECCION, width));
+      // El alto tope es la corona de la interseccion CSV (5.4 m): el collar de boca la cubre.
+      height = Math.max(4.4, Math.min(5.4, height));
     }
 
     const edge = {
       id: `edge_${aId}_${bId}`,
-      type, label, main,
+      type, label, main, wireframeStyle,
       width, height, length,
       pos, yaw, pitch,
-      a: aId, b: bId
+      a: aId, b: bId,
+      variant: this._sectionVariant(type)
     };
     a.edges.push(edge);
     b.edges.push(edge);

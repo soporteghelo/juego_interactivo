@@ -75,8 +75,10 @@ export class NPC {
 
     // Máquina de estados: 'walk' (patrulla) | 'idle' (parado) | 'refuge' (pegado al hastial).
     this.state = this.behavior === 'patrol' ? 'walk' : 'idle';
-    // Yaw base mirando a lo largo del túnel (el modelo mira a -Z con yaw=0).
-    this._idleYaw = Math.atan2(-this.axis.x, -this.axis.z);
+    // Yaw base mirando a lo largo del túnel. El modelo del minero MIRA A +Z con yaw=0
+    // (minero.js: "La cara mira a +Z"), así que se orienta con atan2(+x,+z) — NO al revés
+    // (antes con -x,-z el NPC caminaba de espaldas / "moonwalk").
+    this._idleYaw = Math.atan2(this.axis.x, this.axis.z);
     this.object.rotation.y = this._idleYaw;
     // Giro SUAVE: el rumbo objetivo se interpola (no salta). Evita el giro instantáneo de 180°
     // al fin del tramo y el volteo brusco al refugiarse. `_yawRate` = rad/s de respuesta.
@@ -360,10 +362,11 @@ export class NPC {
     this._running = false;
   }
 
-  /** Fija el rumbo OBJETIVO (mira a -Z con yaw=0) hacia la dirección mundo (dx,dz). El giro
-   *  real lo interpola `_applyYaw` cada frame → sin saltos. */
+  /** Fija el rumbo OBJETIVO hacia la dirección mundo (dx,dz). El modelo MIRA A +Z con yaw=0,
+   *  por eso yaw=atan2(dx,dz) (la cara apunta a donde avanza). El giro real lo interpola
+   *  `_applyYaw` cada frame → sin saltos. */
   _face(dx, dz) {
     if (Math.abs(dx) + Math.abs(dz) < 1e-4) return;
-    this._targetYaw = Math.atan2(-dx, -dz);
+    this._targetYaw = Math.atan2(dx, dz);
   }
 }

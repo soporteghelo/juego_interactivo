@@ -64,3 +64,68 @@ export function crear() {
   };
   return g;
 }
+
+/**
+ * DISPARO SIN LIMPIAR — el muck que TAPA el tope justo despues de la voladura.
+ *
+ * No es la pila conica de un tajeo: es el disparo entero derramado contra el frente, que llena
+ * la labor de hastial a hastial y sube hasta media altura. La roca recien volada esta FRESCA
+ * (caras limpias, sin la patina de polvo del resto de la mina), por eso se ve mucho mas clara
+ * que la caja — es lo primero que delata que el tope acaba de disparar y todavia no se lampea.
+ *
+ * Estatico a proposito (sin `tick`): esto no se agota como la pila de un tajeo, se limpia con
+ * el scoop y desaparece la fase entera. Al ser anonimo y opaco, el fusor de estaticos lo
+ * absorbe en la malla del tramo.
+ *
+ * @param {{ancho?:number, alto?:number, fondo?:number, seed?:number}} opts
+ * @returns {THREE.Group}
+ */
+export function crearDisparo({ ancho = 4.4, alto = 2.3, fondo = 3.2, seed = 1 } = {}) {
+  let s = seed & 0xffff;
+  const rnd = () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 4294967296; };
+
+  const g = new THREE.Group();
+  g.name = 'disparo_sin_limpiar';
+
+  // Roca recien volada: caras frescas, mucho mas claras que la caja polvorienta.
+  const mFresca = MineMaterials.plano(0xa8a49a, { rough: 0.92, metal: 0.02 });
+  const mSombra = MineMaterials.plano(0x6e6a62, { rough: 0.95, metal: 0.02 });
+
+  const S = sub(g, 'muck', 'Muck del disparo',
+    'Roca volada derramada contra el tope: caras frescas, bloques angulares, talud natural.');
+
+  // Talud: se derrama desde el tope hacia la boca perdiendo altura.
+  const capas = 5;
+  for (let i = 0; i < capas; i++) {
+    const t = i / (capas - 1);
+    const z = -fondo * 0.5 + fondo * t;
+    const h = alto * (1 - t * 0.72);
+    const w = ancho * (1 - t * 0.18);
+    const capa = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.5, w * 0.56, h, 7, 1), i % 2 ? mSombra : mFresca);
+    capa.position.set((rnd() - 0.5) * 0.3, h * 0.5 - 0.15, z);
+    capa.rotation.y = rnd() * Math.PI;
+    capa.scale.z = 0.55;
+    S.add(capa);
+  }
+
+  // Bloques angulares sueltos: el muck no es un monton liso, son lajas y bolones quebrados.
+  const laja = new THREE.IcosahedronGeometry(0.42, 0);
+  const nBloques = 26;
+  for (let i = 0; i < nBloques; i++) {
+    const t = rnd();
+    const b = new THREE.Mesh(laja, rnd() < 0.62 ? mFresca : mSombra);
+    const z = -fondo * 0.5 + fondo * t;
+    const yMax = alto * (1 - t * 0.72);
+    b.position.set(
+      (rnd() - 0.5) * ancho * (0.95 - t * 0.15),
+      rnd() * yMax,
+      z + (rnd() - 0.5) * 0.5
+    );
+    b.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+    b.scale.set(0.5 + rnd() * 1.1, 0.35 + rnd() * 0.7, 0.5 + rnd() * 1.1);
+    S.add(b);
+  }
+
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+  return g;
+}

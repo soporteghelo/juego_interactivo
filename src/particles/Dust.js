@@ -11,7 +11,9 @@ import { ParticleSystem } from './ParticleSystem.js';
 export class DustSystem extends ParticleSystem {
   constructor({ scene, camera, settings }) {
     const base = 1200;
-    const count = Math.max(120, Math.round(base * settings.current.particleDensity));
+    // Reserva una sola vez el maximo, pero dibuja/actualiza solo la fraccion del preset actual.
+    // Asi bajar a calidad baja sí reduce CPU/GPU sin recrear buffers durante el juego.
+    const count = base;
     const bounds = { x: 10, y: 5, z: 10 };
 
     const material = new THREE.PointsMaterial({
@@ -26,6 +28,14 @@ export class DustSystem extends ParticleSystem {
 
     super({ scene, count, material, bounds });
     this.camera = camera;
+    this.settings = settings;
+    this.activeCount = Math.max(120, Math.round(base * settings.current.particleDensity));
+    this.geometry.setDrawRange(0, this.activeCount);
+    settings.onChange((quality) => {
+      this.activeCount = Math.max(120, Math.round(base * quality.particleDensity));
+      this.geometry.setDrawRange(0, this.activeCount);
+      this.points.visible = this.activeCount > 0;
+    });
 
     // Distribucion inicial + velocidades de deriva muy suaves.
     for (let i = 0; i < count; i++) {
@@ -44,7 +54,7 @@ export class DustSystem extends ParticleSystem {
     // El sistema de particulas se centra en la camara (recoloca el contenedor).
     this.points.position.set(cam.x, cam.y, cam.z);
 
-    for (let i = 0; i < this.count; i++) {
+    for (let i = 0; i < this.activeCount; i++) {
       const ix = i * 3;
       this.positions[ix] += this.velocities[ix] * dt;
       this.positions[ix + 1] += this.velocities[ix + 1] * dt;

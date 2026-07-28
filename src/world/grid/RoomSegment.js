@@ -23,7 +23,7 @@ import { crear as crearEstacionEmergencia } from '../../elementos/ssoma/estacion
 import { crear as crearPuntoResiduos } from '../../elementos/ssoma/punto_residuos.js';
 import { crear as crearSensorGases } from '../../elementos/ssoma/sensor_gases.js';
 import { crear as crearDuchaLavaojos } from '../../elementos/ssoma/ducha_lavaojos.js';
-import { crear as crearPilaMineral } from '../../elementos/entorno/pila_mineral.js';
+import { crear as crearPilaMineral, crearDisparo } from '../../elementos/entorno/pila_mineral.js';
 import { crear as crearEstacionTotal } from '../../elementos/entorno/estacion_total.js';
 import { crear as crearFrenteCargado } from '../../elementos/entorno/frente_cargado.js';
 import { crear as crearMallaNaranja } from '../../elementos/ssoma/malla_naranja.js';
@@ -171,6 +171,24 @@ export class RoomSegment {
 
     const place = (obj, x, y, z, yaw = faceYaw) => {
       if (!obj) return;
+      // En un fondo de saco de galibo continuo, las posiciones historicas de una sala de
+      // 12 x 12 m no pueden quedar fuera de los hastiales. Proyectamos cada ancla a los ejes
+      // longitudinal/lateral de la labor y la limitamos al volumen realmente excavado.
+      if (this.terminalLabor) {
+        const perp = { x: openDir.z, z: -openDir.x };
+        const depth = THREE.MathUtils.clamp(
+          x * back.x + z * back.z,
+          -this.length / 2 + 0.55,
+          this.length / 2 - 0.55
+        );
+        const lateral = THREE.MathUtils.clamp(
+          x * perp.x + z * perp.z,
+          -this.width / 2 + 0.25,
+          this.width / 2 - 0.25
+        );
+        x = back.x * depth + perp.x * lateral;
+        z = back.z * depth + perp.z * lateral;
+      }
       obj.position.set(x, y, z);
       obj.rotation.y = yaw;
       this.group.add(obj);
@@ -261,7 +279,7 @@ export class RoomSegment {
         place(tryCrear(() => crearFrenteCargado()),
           back.x * this.size * 0.4 - px * 2.6, 0, back.z * this.size * 0.4 - pz * 2.6, faceYaw);
         // Bloqueo de acceso por voladura en la boca: cordón + señal + hazard 'prohibida'.
-        const mouth = this.size - 2 * POST_T;
+        const mouth = this.terminalLabor ? this.width * 0.90 : this.size - 2 * POST_T;
         const cordon = tryCrear(() => crearCordonBloqueo({ ancho: mouth, nombre: 'VOLADURA' }));
         if (cordon) cordon.userData.hazard = {
           tipo: 'prohibida', warn: 6,
@@ -327,6 +345,35 @@ export class RoomSegment {
         place(tryCrear(() => crearTelefonoEmergencia()), -this.size * 0.34, 0, -bz * 0.4, faceYaw);
         break;
       }
+      case 'disparado': { // TOPE RECIÉN DISPARADO: el muck tapa el frente, aún sin lampear
+        // Fase que faltaba del ciclo de avance: entre la voladura y la limpieza el tope queda
+        // TAPADO por su propio disparo. Es la escena mas reconocible de un frente real y la que
+        // explica por que el scoop tiene trabajo.
+        const halfD = this.size / 2;
+        const vano = this.terminalLabor ? this.width : this.size - 2 * POST_T;
+        const disparo = tryCrear(() => crearDisparo({
+          ancho: vano * 0.94, alto: Math.min(2.6, this.height * 0.55), fondo: 3.4,
+          seed: Math.round(Math.abs(this.group.position.x) + Math.abs(this.group.position.z)) + 5
+        }));
+        if (disparo) {
+          // Nadie atraviesa un disparo: la pila es solida y ademas avisa (roca inestable).
+          disparo.userData.hazard = {
+            tipo: 'prohibida', warn: 5,
+            aviso: 'FRENTE DISPARADO — muck sin limpiar. No transites sobre la pila: hay roca inestable y bolones sueltos.'
+          };
+          place(disparo, back.x * halfD * 0.62, 0, back.z * halfD * 0.62, faceYaw);
+        }
+        // Roca proyectada mas alla del talud (el disparo siempre bota material hacia la boca).
+        for (let i = 0; i < 5; i++) {
+          place(tryCrear(() => crearRocaSuelta({ mineralizada: i % 2 === 0 })),
+            bx * 0.35 + (i - 2) * 1.15, 0, bz * 0.35 + (i % 2) * 0.8, 0);
+        }
+        // El scoop que viene a lampear espera en la boca, de cara a la pila.
+        place(tryCrear(() => crearScoop()), openDir.x * halfD * 0.45, 0, openDir.z * halfD * 0.45, faceYaw + Math.PI);
+        // Ventilando gases de voladura: nadie entra hasta que despeje.
+        place(tryCrear(() => crearSensorGases()), this.size * 0.34, 0, 0, faceYaw);
+        break;
+      }
       case 'desatado': { // DESATADO MANUAL: frente en desate — barretillas, roca caída, herramientas
         const half = this.size / 2;                     // semilado de la sala (build() lo tiene local)
         const perpx = openDir.z, perpz = -openDir.x;   // unit perpendicular al acceso
@@ -342,7 +389,7 @@ export class RoomSegment {
             bx + (i - 1.5) * 1.1, 0, bz - back.z * 1.4 - back.x * 0.0, 0);
         }
         // BLOQUEO DE ACCESO en la boca (PETS: cordón rojo + bastón luminoso + nombre del maestro).
-        const mouthW = this.size - 2 * POST_T;
+        const mouthW = this.terminalLabor ? this.width * 0.90 : this.size - 2 * POST_T;
         const bocaYaw = openDir.x ? Math.PI / 2 : 0;   // el cordón (span X) cruza la boca
         place(tryCrear(() => crearCordonBloqueo({ ancho: mouthW, baston: true, nombre: 'J. QUISPE' })),
           openDir.x * (half - 0.4), 0, openDir.z * (half - 0.4), bocaYaw);
@@ -355,8 +402,8 @@ export class RoomSegment {
     // ── MALLA PLÁSTICA NARANJA delimitando la boca de las labores ACTIVAS ──
     // (base de conocimiento §4: "mallas plásticas naranjas delimitando frentes"). En el frente
     // queda por DENTRO del cordón de voladura: primero la cinta, luego la malla.
-    if (['frente', 'sostenimiento', 'shotcrete', 'desatado'].includes(this.roomType)) {
-      const vano = this.size - 2 * POST_T;
+    if (['frente', 'sostenimiento', 'shotcrete', 'desatado', 'disparado'].includes(this.roomType)) {
+      const vano = this.terminalLabor ? this.width * 0.90 : this.size - 2 * POST_T;
       place(tryCrear(() => crearMallaNaranja({ ancho: vano * 0.86 })),
         openDir.x * this.size * 0.30, 0, openDir.z * this.size * 0.30, faceYaw);
     }

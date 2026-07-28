@@ -22,7 +22,6 @@ export class CharacterController {
     this.jumpSpeed = 6.2;
 
     this._tmp = new THREE.Vector3();
-    this._stuckFrames = 0;    // contador anti-atasco
   }
 
   get position() {
@@ -57,31 +56,26 @@ export class CharacterController {
       this.verticalVelocity = -1; // mantener pegado al piso
     }
 
-    // Anti-atasco: si el jugador intenta moverse horizontalmente pero el controlador
-    // devuelve movimiento nulo durante varias frames seguidas, aplica un pequeño empuje
-    // hacia arriba para que la cápsula salga de la arista donde quedó enganchada.
-    const hDeseado   = horizontal.x * horizontal.x + horizontal.z * horizontal.z;
-    const hCorregido = corrected.x  * corrected.x  + corrected.z  * corrected.z;
-    if (hDeseado > 1e-4 && this.grounded && hCorregido < hDeseado * 0.04) {
-      this._stuckFrames++;
-    } else {
-      this._stuckFrames = 0;
-    }
-    // Empuje suave de 3 cm/frame tras ~0.33 s atascado; se resetea al desbloquearse.
-    const nudgeY = this._stuckFrames >= 20 ? 0.03 : 0;
-    if (this._stuckFrames > 60) this._stuckFrames = 0; // evita empujar indefinidamente
+    // Al presionar contra el hastial NO se altera Y. El antiguo empuje anti-atasco de 3 cm/frame
+    // hacia arriba rebotaba la camara y se percibia como lag; las costuras entre tramos se
+    // resuelven en Physics (autostep/snap + FIX_INTERNAL_EDGES), no empujando la capsula.
 
     const t = this.body.translation();
     this.body.setNextKinematicTranslation({
       x: t.x + corrected.x,
-      y: t.y + corrected.y + nudgeY,
+      y: t.y + corrected.y,
       z: t.z + corrected.z
     });
   }
 
   /** Reposiciona el cuerpo (ej: respawn). */
   teleport(position) {
-    this.body.setTranslation({ x: position.x, y: position.y, z: position.z }, true);
+    const target = { x: position.x, y: position.y, z: position.z };
+    this.body.setTranslation(target, true);
+    // Un cuerpo cinematico conserva su siguiente destino. Igualarlo evita que el proximo
+    // world.step lo arrastre hacia la ubicacion previa y parezca un segundo reinicio.
+    this.body.setNextKinematicTranslation(target);
     this.verticalVelocity = 0;
+    this.grounded = false;
   }
 }

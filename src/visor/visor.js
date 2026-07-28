@@ -275,6 +275,24 @@ function actualizarInfo() {
   }
 }
 
+/**
+ * Ficha corta de un subelemento: medidas de su caja envolvente, número de
+ * mallas e id. Es lo que se muestra al pedir "ver los detalles" de una pieza.
+ * @param {THREE.Object3D|null} grupo
+ */
+function fichaDe(grupo) {
+  if (!grupo) return '';
+  const box = new THREE.Box3().setFromObject(grupo);
+  if (box.isEmpty()) return '';
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  let piezas = 0;
+  grupo.traverse((o) => { if (o.isMesh) piezas++; });
+  const id = grupo.userData?.subelemento?.id ?? '';
+  return `${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m` +
+         `  ·  ${piezas} malla${piezas === 1 ? '' : 's'}` + (id ? `  ·  ${id}` : '');
+}
+
 function aplicarWireframe() {
   if (!actual) return;
   actual.traverse((c) => {
@@ -297,14 +315,16 @@ const tourTitulo = document.getElementById('tour-titulo');
 const tourTexto  = document.getElementById('tour-texto');
 const tourAvance = document.getElementById('tour-avance');
 const tourPlay   = document.getElementById('tour-play');
+const tourDetalle = document.getElementById('tour-detalle');
 
 const tour = new RecorridoGuiado({
   scene, camera, controls,
   onPaso: (i, total, paso) => {
-    tourPaso.textContent   = `PASO ${String(i + 1).padStart(2, '0')} / ${total}`;
-    tourTitulo.textContent = paso.titulo || '';
-    tourTexto.textContent  = paso.texto || '';
-    tourAvance.style.width = '0%';
+    tourPaso.textContent    = `PASO ${String(i + 1).padStart(2, '0')} / ${total}`;
+    tourTitulo.textContent  = paso.titulo || '';
+    tourTexto.textContent   = paso.texto || '';
+    tourDetalle.textContent = fichaDe(paso.grupo);
+    tourAvance.style.width  = '0%';
   },
   onProgreso: (frac) => { tourAvance.style.width = `${(frac * 100).toFixed(1)}%`; },
   onFin: () => {
@@ -405,6 +425,86 @@ window.addEventListener('keydown', (e) => {
   else if (e.code === 'ArrowLeft') { e.preventDefault(); tour.anterior(); }
   else if (e.code === 'Space') { e.preventDefault(); tourPlay.textContent = tour.alternarPausa() ? '▶' : '❚❚'; }
   else if (e.code === 'Escape') { e.preventDefault(); tour.detener(false); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  SELECCIÓN POR DOBLE CLIC EN LA ESCENA
+// ══════════════════════════════════════════════════════════════════════════
+//  Doble clic sobre una pieza ⇒ se muestran sus detalles:
+//    · durante el RECORRIDO GUIADO salta al paso de esa pieza (la cámara vuela,
+//      el marcador la enmarca, el panel muestra su ficha) y PAUSA el avance
+//      automático, para que se pueda leer sin que se escape;
+//    · fuera del recorrido, la aísla igual que si se eligiera en la lista.
+//
+//  El casco envuelve a todo lo demás, así que un rayo lanzado desde fuera lo
+//  toca SIEMPRE primero. Para que el doble clic seleccione lo que el usuario
+//  realmente ve, se resuelven las capas así:
+//    1) gana el primer impacto que NO esté atenuado como fantasma — durante el
+//       recorrido un fantasma al 8 % es, visualmente, "no está ahí";
+//    2) si todas las capas son fantasma, el usuario está apuntando A TRAVÉS del
+//       casco a algo de dentro: se salta la primera y se toma la siguiente;
+//    3) si solo hay una capa, esa.
+
+const rayo = new THREE.Raycaster();
+const puntero = new THREE.Vector2();
+const OPACIDAD_FANTASMA = 0.35;   // por debajo de esto la superficie no "cuenta"
+
+/** Opacidad efectiva de la superficie impactada (1 si es opaca). */
+function opacidadDe(malla) {
+  const m = Array.isArray(malla.material) ? malla.material[0] : malla.material;
+  if (!m) return 1;
+  return m.transparent ? m.opacity : 1;
+}
+
+/** Subelemento antecesor de una malla dentro del elemento actual, o null. */
+function subelementoDe(obj) {
+  for (let p = obj; p && p !== actual; p = p.parent) {
+    if (p.userData?.subelemento) return p;
+  }
+  return null;
+}
+
+/** Subelementos distintos bajo el puntero, ordenados de cerca a lejos. */
+function capasBajoPuntero(ev) {
+  if (!actual) return [];
+  const r = renderer.domElement.getBoundingClientRect();
+  puntero.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+  puntero.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+  rayo.setFromCamera(puntero, camera);
+
+  const capas = [];
+  const vistos = new Set();
+  for (const imp of rayo.intersectObject(actual, true)) {
+    const grupo = subelementoDe(imp.object);
+    if (!grupo || vistos.has(grupo)) continue;
+    vistos.add(grupo);
+    capas.push({ grupo, fantasma: opacidadDe(imp.object) < OPACIDAD_FANTASMA });
+  }
+  return capas;
+}
+
+renderer.domElement.addEventListener('dblclick', (ev) => {
+  const capas = capasBajoPuntero(ev);
+  if (!capas.length) return;
+  ev.preventDefault();
+
+  let idx = capas.findIndex((c) => !c.fantasma);    // lo primero que se ve de verdad
+  if (idx < 0) idx = capas.length > 1 ? 1 : 0;      // todo fantasma: se mira A TRAVÉS
+
+  const grupo = capas[idx].grupo;
+  if (tour.activo && grupo !== tour.grupoActual) {
+    // Primer doble clic sobre una pieza: saltar a su paso y quedarse ahí.
+    const i = tour.indiceDe(grupo);
+    if (i < 0) return;                              // pieza fuera del guion
+    tour.irA(i);
+    tour.pausar(true);                              // se pidió verla: no seguir solo
+    tourPlay.textContent = '▶';
+  } else {
+    // Fuera del recorrido, o SEGUNDO doble clic sobre la pieza ya enfocada:
+    // se sale de la vista guiada y la pieza queda aislada para inspeccionarla
+    // con libertad (`seleccionarSub` ya cierra el recorrido por su cuenta).
+    seleccionarSub(grupo.userData.subelemento.id);
+  }
 });
 
 // ── Controles de UI ───────────────────────────────────────────────────────

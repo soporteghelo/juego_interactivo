@@ -30,6 +30,23 @@ npm run dev      # arranca el servidor de desarrollo (Vite)
 Abre la URL que imprime Vite (por defecto `http://localhost:5173`).
 Pulsa **INGRESAR A LA MINA** para activar controles y audio.
 
+### Mina completa 3D desde CSV
+
+La portada incluye **VER MINA COMPLETA 3D**, que abre el modelo ensamblado a escala
+`1:1` en 54 emplazamientos creados desde los 34 archivos de `prueba/elementos/`.
+La mina cubre superficie y niveles 160, 128, 96 y 64. La vista permite orbitar, cambiar
+entre perspectiva/planta/perfil, cortar por cota, mostrar la triangulación, ocultar
+servicios y enfocar una labor individual.
+
+```bash
+npm run generate:mine  # regenera elementos + mina maestra
+npm run test:mine      # valida emplazamientos, cotas, extensión y triángulos
+```
+
+El archivo maestro es `prueba/elementos/_mina_completa.csv`; su catálogo de ubicación
+es `_mina_completa_layout.csv`. Ambos mantienen la convención topográfica X=Este,
+Y=Norte, Z=cota y una unidad igual a un metro.
+
 ### Probar en el celular
 
 El `vite.config.js` expone el servidor en la red local (`server.host`). Con el PC y el

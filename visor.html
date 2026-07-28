@@ -185,6 +185,14 @@
     }
     #tour-titulo { font-size: 1.02rem; color: #ffcc00; margin: 5px 0 6px; }
     #tour-texto  { font-size: 0.84rem; line-height: 1.5; color: #c8d2dc; }
+    /* Ficha de la pieza: medidas y numero de piezas del subelemento */
+    #tour-detalle {
+      font-family: Consolas, monospace; font-size: 0.72rem;
+      color: #8fa2b4; margin-top: 8px;
+      border-top: 1px solid #2c333c; padding-top: 7px;
+    }
+    #tour-detalle:empty { display: none; }
+    #tour-pista { font-size: 0.72rem; color: #6b7c8c; margin-top: 5px; font-style: italic; }
 
     #tour-btns { display: flex; align-items: center; gap: 6px; padding: 10px 16px 12px; }
     #tour-btns button {
@@ -372,6 +380,8 @@
           <span id="tour-paso">PASO 01</span>
           <h2 id="tour-titulo">—</h2>
           <p  id="tour-texto"></p>
+          <p  id="tour-detalle"></p>
+          <p  id="tour-pista">Doble clic sobre una pieza para saltar a ella y ver su ficha. Doble clic otra vez sobre la misma pieza para salir del recorrido y quedarte con ella.</p>
         </div>
         <div id="tour-btns">
           <button id="tour-prev" title="Parte anterior (←)">◀◀</button>

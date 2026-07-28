@@ -3,5 +3,20 @@ dist/
 .env
 *.local
 
+# Visor autocontenido generado (npm run build:visor). Regenerable; no se versiona.
+visor-standalone.html
+
 # Modelos GLB pesados de referencia (no se usan en runtime; el jumbo es procedural)
 *.glb
+
+# Nubes de puntos generadas por `npm run generate:mine` (73 MB). Se regeneran desde
+# prueba/generar_elementos_mina.mjs + generar_mina_completa.mjs, asi que no se versionan.
+# Si se exceptuan el catalogo de labores y el plano de emplazamientos, que son de autoria.
+prueba/elementos/*.csv
+!prueba/elementos/_catalogo.csv
+!prueba/elementos/_mina_completa_layout.csv
+
+# Artefactos de depuracion: capturas de pantalla, logs de Playwright y salidas de diagnostico
+*.jpeg
+.playwright-mcp/
+huecos.json

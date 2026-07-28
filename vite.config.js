@@ -27,6 +27,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main:  resolve(__dirname, 'index.html'),
+        minaCompleta: resolve(__dirname, 'mina-completa.html'),
         visor: resolve(__dirname, 'visor.html')
       },
       output: {

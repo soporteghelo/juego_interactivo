@@ -34,8 +34,13 @@ export class Input {
     this.controlScheme = 'desktop'; // lo fija el Engine segun Device ('desktop'|'touch')
 
     this._keys = new Set();
+    this._resetMotion = () => this.resetMotion();
     this._bindKeyboard();
     this._bindMouse();
+    window.addEventListener('blur', this._resetMotion);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.resetMotion();
+    });
   }
 
   // ---- API publica (la leen el jugador / consumen TouchControls) ----
@@ -84,6 +89,14 @@ export class Input {
     return false;
   }
 
+  /** Limpia teclas/joystick sostenidos para que perder foco no deje correr al maximo. */
+  resetMotion() {
+    this._keys.clear();
+    this.move.x = 0;
+    this.move.y = 0;
+    for (const key of Object.keys(this._held)) this._held[key] = false;
+  }
+
   // ---- Teclado ----
 
   _bindKeyboard() {
@@ -125,6 +138,7 @@ export class Input {
 
     document.addEventListener('pointerlockchange', () => {
       this.pointerLocked = document.pointerLockElement === this.dom;
+      if (!this.pointerLocked && this.controlScheme !== 'touch') this.resetMotion();
     });
 
     document.addEventListener('mousemove', (e) => {

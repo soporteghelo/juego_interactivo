@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Triangulador XYZ</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071019;
+      --panel: rgba(14, 27, 40, .88);
+      --panel-2: #101f2e;
+      --line: rgba(167, 196, 216, .16);
+      --text: #edf7ff;
+      --muted: #91a8b9;
+      --accent: #51d6b2;
+      --accent-2: #2ea9ff;
+      --danger: #ff7c7c;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+    body { overflow: hidden; }
+    button, input, select { font: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 310px 1fr;
+      height: 100vh;
+      background:
+        radial-gradient(circle at 88% 12%, rgba(46, 169, 255, .10), transparent 32%),
+        radial-gradient(circle at 18% 85%, rgba(81, 214, 178, .08), transparent 32%),
+        var(--bg);
+    }
+
+    aside {
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 22px;
+      overflow-y: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .logo {
+      width: 38px; height: 38px; display: grid; place-items: center;
+      border: 1px solid rgba(81, 214, 178, .35); border-radius: 11px;
+      background: rgba(81, 214, 178, .1); color: var(--accent);
+    }
+    .logo svg { width: 22px; height: 22px; }
+    h1 { margin: 0; font-size: 17px; letter-spacing: .02em; font-weight: 650; }
+    .subtitle { margin-top: 2px; color: var(--muted); font-size: 12px; }
+
+    .import-button, .secondary-button {
+      width: 100%; min-height: 42px; border-radius: 10px; cursor: pointer;
+      border: 1px solid transparent; transition: transform .15s, border-color .15s, background .15s;
+    }
+    .import-button { color: #032219; background: var(--accent); font-weight: 700; }
+    .import-button:hover { transform: translateY(-1px); background: #70e2c2; }
+    .import-button:disabled { cursor: not-allowed; opacity: .42; transform: none; }
+    .secondary-button { color: var(--text); background: var(--panel-2); border-color: var(--line); }
+    .secondary-button:hover { border-color: rgba(81, 214, 178, .5); }
+
+    .file-note { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .mapping[hidden], .sheet-control[hidden] { display: none; }
+    .sheet-control { margin-bottom: 12px; }
+    .axis-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .axis-field label, .sheet-control label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 11px; }
+    .mapping-mode { margin-bottom: 12px; }
+    .mapping-mode label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 11px; }
+    .vertex-mapping[hidden], .point-mapping[hidden] { display: none; }
+    .vertex-group { margin-top: 10px; }
+    .vertex-title { margin-bottom: 6px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    select {
+      width: 100%; min-width: 0; height: 36px; padding: 0 7px; color: var(--text);
+      border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2);
+    }
+    select:focus { outline: 2px solid rgba(81, 214, 178, .35); outline-offset: 1px; }
+    .column-preview {
+      margin: 10px 0 12px; padding: 9px; overflow: hidden; border-radius: 8px;
+      background: rgba(255,255,255,.035); border: 1px solid var(--line);
+      color: var(--muted); font-size: 10px; line-height: 1.55; font-variant-numeric: tabular-nums;
+    }
+    .text-destructive { color: var(--danger); }
+    .preview-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .preview-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .section { padding-top: 17px; border-top: 1px solid var(--line); }
+    .section-title {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 13px; color: var(--muted); font-size: 11px;
+      font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    }
+
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .stat { padding: 11px; border-radius: 9px; background: rgba(255,255,255,.035); border: 1px solid var(--line); }
+    .stat-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .stat-value { margin-top: 4px; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .stat-wide { grid-column: 1 / -1; }
+
+    .control { margin-bottom: 15px; }
+    .control:last-child { margin-bottom: 0; }
+    .control-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; font-size: 12px; }
+    .control-head output { color: var(--accent); font-variant-numeric: tabular-nums; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .check-row { display: flex; align-items: center; gap: 9px; margin: 10px 0; font-size: 12px; color: var(--muted); }
+    .check-row input { accent-color: var(--accent); }
+
+    .view-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .view-actions button { min-height: 36px; }
+    .help { margin-top: auto; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    kbd { padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--text); background: var(--panel-2); }
+
+    main { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; outline: none; }
+    canvas.dragging { cursor: grabbing; }
+    canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+    .topbar {
+      position: absolute; z-index: 1; top: 18px; left: 20px; right: 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      pointer-events: none;
+    }
+    .dataset-name, .status {
+      max-width: 55%; padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px;
+      background: rgba(7, 16, 25, .68); backdrop-filter: blur(10px); font-size: 12px;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+    .status { color: var(--muted); }
+    .status.error { color: var(--danger); border-color: rgba(255,124,124,.3); }
+
+    .legend {
+      position: absolute; right: 22px; bottom: 22px; width: min(260px, calc(100% - 44px));
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px;
+      background: rgba(7, 16, 25, .72); backdrop-filter: blur(10px);
+    }
+    .legend-title { margin-bottom: 7px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+    .gradient { height: 8px; border-radius: 99px; background: linear-gradient(90deg, #263b91, #167ab8, #1fb996, #abd646, #f7cf45, #f06a3b); }
+    .legend-values { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+    .empty-state {
+      position: absolute; inset: 0; display: none; place-items: center; pointer-events: none;
+      color: var(--muted); text-align: center; font-size: 13px;
+    }
+
+    @media (max-width: 720px) {
+      body { overflow: auto; }
+      .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(520px, 70vh); height: auto; min-height: 100vh; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; }
+      .stats { grid-template-columns: repeat(3, 1fr); }
+      .stat-wide { grid-column: auto; }
+      .help { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside aria-label="Controles del triangulador">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 18 8.2 6l4.3 8L16 4l5 14Z"/><path d="M3 18h18M7 14h12"/></svg>
+        </div>
+        <div><h1>Triangulador XYZ</h1><div class="subtitle">Malla y wireframe 3D interactivo</div></div>
+      </div>
+
+      <div>
+        <button class="import-button" id="openFile" type="button">Importar CSV / XLSX</button>
+        <input id="fileInput" type="file" accept=".csv,.xlsx" hidden>
+        <p class="file-note">Admite puntos XYZ y wireframes con tres vértices por fila. Los datos se procesan localmente.</p>
+      </div>
+
+      <section class="section mapping" id="mappingPanel" aria-labelledby="mappingTitle" hidden>
+        <div class="section-title" id="mappingTitle"><span>Asignar columnas</span><span id="pendingRows">—</span></div>
+        <div class="sheet-control" id="sheetControl" hidden>
+          <label for="sheetSelect">Hoja de Excel</label>
+          <select id="sheetSelect"></select>
+        </div>
+        <div class="mapping-mode">
+          <label for="geometryMode">Formato geométrico</label>
+          <select id="geometryMode">
+            <option value="points">Puntos XYZ · triangulación automática</option>
+            <option value="faces">Wireframe · tres vértices por fila</option>
+          </select>
+        </div>
+        <div class="point-mapping" id="pointMapping">
+          <div class="axis-grid">
+            <div class="axis-field"><label for="xColumn">Eje X</label><select id="xColumn"></select></div>
+            <div class="axis-field"><label for="yColumn">Eje Y</label><select id="yColumn"></select></div>
+            <div class="axis-field"><label for="zColumn">Eje Z</label><select id="zColumn"></select></div>
+          </div>
+        </div>
+        <div class="vertex-mapping" id="vertexMapping" hidden>
+          <div class="vertex-group">
+            <div class="vertex-title">Vértice 1</div>
+            <div class="axis-grid">
+              <div class="axis-field"><label for="x1Column">X1</label><select id="x1Column"></select></div>
+              <div class="axis-field"><label for="y1Column">Y1</label><select id="y1Column"></select></div>
+              <div class="axis-field"><label for="z1Column">Z1</label><select id="z1Column"></select></div>
+            </div>
+          </div>
+          <div class="vertex-group">
+            <div class="vertex-title">Vértice 2</div>
+            <div class="axis-grid">
+              <div class="axis-field"><label for="x2Column">X2</label><select id="x2Column"></select></div>
+              <div class="axis-field"><label for="y2Column">Y2</label><select id="y2Column"></select></div>
+              <div class="axis-field"><label for="z2Column">Z2</label><select id="z2Column"></select></div>
+            </div>
+          </div>
+          <div class="vertex-group">
+            <div class="vertex-title">Vértice 3</div>
+            <div class="axis-grid">
+              <div class="axis-field"><label for="x3Column">X3</label><select id="x3Column"></select></div>
+              <div class="axis-field"><label for="y3Column">Y3</label><select id="y3Column"></select></div>
+              <div class="axis-field"><label for="z3Column">Z3</label><select id="z3Column"></select></div>
+            </div>
+          </div>
+        </div>
+        <div class="column-preview" id="columnPreview" aria-live="polite"></div>
+        <button class="import-button" id="buildSurface" type="button" disabled>Graficar superficie</button>
+      </section>
+
+      <section class="section" aria-labelledby="statsTitle">
+        <div class="section-title" id="statsTitle"><span>Datos</span><span id="rowCount">—</span></div>
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Puntos</div><div class="stat-value" id="pointStat">—</div></div>
+          <div class="stat"><div class="stat-label">Triángulos</div><div class="stat-value" id="triangleStat">—</div></div>
+          <div class="stat stat-wide"><div class="stat-label">Rango Z</div><div class="stat-value" id="zStat">—</div></div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="surfaceTitle">
+        <div class="section-title" id="surfaceTitle">Superficie</div>
+        <div class="control">
+          <div class="control-head"><label for="verticalScale">Exageración vertical</label><output id="verticalOut">1.0×</output></div>
+          <input id="verticalScale" type="range" min="0" max="5" step="0.1" value="1">
+        </div>
+        <div class="control">
+          <div class="control-head"><label for="edgeFilter">Conservar aristas</label><output id="edgeOut">100%</output></div>
+          <input id="edgeFilter" type="range" min="50" max="100" step="1" value="100">
+        </div>
+        <label class="check-row"><input id="showMesh" type="checkbox" checked> Mostrar malla triangular</label>
+        <label class="check-row"><input id="showPoints" type="checkbox"> Mostrar puntos importados</label>
+      </section>
+
+      <section class="section" aria-labelledby="viewTitle">
+        <div class="section-title" id="viewTitle">Vista</div>
+        <div class="view-actions">
+          <button class="secondary-button" id="isoView" type="button">Isométrica</button>
+          <button class="secondary-button" id="topView" type="button">Planta</button>
+          <button class="secondary-button" id="fitView" type="button">Centrar</button>
+          <button class="secondary-button" id="sampleFile" type="button">Galería demo</button>
+        </div>
+      </section>
+
+      <div class="help"><strong>Controles:</strong> arrastra para girar · rueda para acercar · <kbd>Mayús</kbd> + arrastre para desplazar.</div>
+    </aside>
+
+    <main>
+      <canvas id="terrain" tabindex="0" aria-label="Superficie tridimensional triangulada de los puntos importados"></canvas>
+      <div class="topbar">
+        <div class="dataset-name" id="datasetName">Preparando ejemplo…</div>
+        <div class="status" id="status" role="status">Calculando superficie</div>
+      </div>
+      <div class="legend" aria-label="Escala de elevación">
+        <div class="legend-title">Elevación Z</div>
+        <div class="gradient"></div>
+        <div class="legend-values"><span id="legendMin">—</span><span id="legendMid">—</span><span id="legendMax">—</span></div>
+      </div>
+      <div class="empty-state" id="emptyState">Importa un archivo para construir la superficie.</div>
+    </main>
+  </div>
+
+  <script src="./vendor/xlsx.full.min.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const $ = id => document.getElementById(id);
+      const canvas = $('terrain');
+      const ctx = canvas.getContext('2d');
+      const ui = {
+        openFile: $('openFile'), fileInput: $('fileInput'), sampleFile: $('sampleFile'),
+        mappingPanel: $('mappingPanel'), pendingRows: $('pendingRows'), sheetControl: $('sheetControl'),
+        sheetSelect: $('sheetSelect'), xColumn: $('xColumn'), yColumn: $('yColumn'), zColumn: $('zColumn'),
+        geometryMode: $('geometryMode'), pointMapping: $('pointMapping'), vertexMapping: $('vertexMapping'),
+        x1Column: $('x1Column'), y1Column: $('y1Column'), z1Column: $('z1Column'),
+        x2Column: $('x2Column'), y2Column: $('y2Column'), z2Column: $('z2Column'),
+        x3Column: $('x3Column'), y3Column: $('y3Column'), z3Column: $('z3Column'),
+        columnPreview: $('columnPreview'), buildSurface: $('buildSurface'),
+        datasetName: $('datasetName'), status: $('status'), rowCount: $('rowCount'),
+        pointStat: $('pointStat'), triangleStat: $('triangleStat'), zStat: $('zStat'),
+        legendMin: $('legendMin'), legendMid: $('legendMid'), legendMax: $('legendMax'),
+        verticalScale: $('verticalScale'), verticalOut: $('verticalOut'),
+        edgeFilter: $('edgeFilter'), edgeOut: $('edgeOut'), showMesh: $('showMesh'),
+        showPoints: $('showPoints'), isoView: $('isoView'), topView: $('topView'),
+        fitView: $('fitView'), emptyState: $('emptyState')
+      };
+
+      const state = {
+        points: [], triangles: [], visibleTriangles: [], edges: [], rows: 0,
+        bounds: null, yaw: -0.72, elevation: 0.52, zoom: 1, panX: 0, panY: 0,
+        vertical: 1, edgePercent: 100, dragging: false, panning: false,
+        lastX: 0, lastY: 0, dirty: true, pending: null, workbook: null, pendingName: '', workbookName: ''
+      };
+
+      function numberFormat(value, digits = 2) {
+        return Number(value).toLocaleString('es-PE', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+      }
+
+      function setStatus(message, error = false) {
+        ui.status.textContent = message;
+        ui.status.classList.toggle('error', error);
+      }
+
+      function normalizeHeader(value) {
+        return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      }
+
+      function guessDelimiter(line) {
+        const choices = [',', ';', '\t'];
+        let best = null, bestCount = 0;
+        for (const delimiter of choices) {
+          const count = line.split(delimiter).length - 1;
+          if (count > bestCount) { best = delimiter; bestCount = count; }
+        }
+        return bestCount ? best : null;
+      }
+
+      function splitLine(line, delimiter) {
+        if (!delimiter) return line.trim().split(/\s+/);
+        const parts = [];
+        let value = '', quoted = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (quoted && line[i + 1] === '"') { value += '"'; i++; }
+            else quoted = !quoted;
+          } else if (char === delimiter && !quoted) { parts.push(value.trim()); value = ''; }
+          else value += char;
+        }
+        parts.push(value.trim());
+        return parts;
+      }
+
+      function parseNumber(value, delimiter) {
+        let clean = String(value ?? '').trim().replace(/\s/g, '');
+        if (delimiter !== ',' && /^[-+]?\d+,\d+(?:[eE][-+]?\d+)?$/.test(clean)) clean = clean.replace(',', '.');
+        const number = Number(clean);
+        return Number.isFinite(number) ? number : NaN;
+      }
+
+      const aliases = {
+        x: ['x', 'xpt', 'coordx', 'coordenadax', 'este', 'easting'],
+        y: ['y', 'ypt', 'coordy', 'coordenaday', 'norte', 'northing'],
+        z: ['z', 'zpt', 'coordz', 'coordenadaz', 'cota', 'elevacion', 'elevation', 'altura']
+      };
+      const faceAliases = {
+        x1: ['xp1', 'x1', 'vertex1x', 'vertice1x'], y1: ['yp1', 'y1', 'vertex1y', 'vertice1y'], z1: ['zp1', 'z1', 'vertex1z', 'vertice1z'],
+        x2: ['xp2', 'x2', 'vertex2x', 'vertice2x'], y2: ['yp2', 'y2', 'vertex2y', 'vertice2y'], z2: ['zp2', 'z2', 'vertex2z', 'vertice2z'],
+        x3: ['xp3', 'x3', 'vertex3x', 'vertice3x'], y3: ['yp3', 'y3', 'vertex3y', 'vertice3y'], z3: ['zp3', 'z3', 'vertex3z', 'vertice3z']
+      };
+      const knownHeaders = new Set([...aliases.x, ...aliases.y, ...aliases.z, ...Object.values(faceAliases).flat()]);
+      const faceSelects = () => [ui.x1Column, ui.y1Column, ui.z1Column, ui.x2Column, ui.y2Column, ui.z2Column, ui.x3Column, ui.y3Column, ui.z3Column];
+      const faceKeys = ['x1', 'y1', 'z1', 'x2', 'y2', 'z2', 'x3', 'y3', 'z3'];
+
+      function detectHeaderRow(matrix, delimiter) {
+        let bestIndex = 0, bestScore = -Infinity, bestRecognized = 0, bestText = 0;
+        matrix.slice(0, 20).forEach((row, index) => {
+          const values = row.map(value => String(value ?? '').trim()).filter(Boolean);
+          const recognized = values.filter(value => knownHeaders.has(normalizeHeader(value))).length;
+          const textCells = values.filter(value => !Number.isFinite(parseNumber(value, delimiter))).length;
+          const score = recognized * 20 + textCells * 2 + values.length - index * .05;
+          if (score > bestScore) { bestIndex = index; bestScore = score; bestRecognized = recognized; bestText = textCells; }
+        });
+        return bestRecognized >= 2 || bestText >= 3 ? bestIndex : -1;
+      }
+
+      function tableFromMatrix(matrix, delimiter = null) {
+        const clean = matrix.filter(row => row.some(value => String(value ?? '').trim() !== ''));
+        if (clean.length < 3) throw new Error('El archivo no contiene suficientes filas.');
+        const headerIndex = detectHeaderRow(clean, delimiter);
+        const columnCount = Math.max(...clean.map(row => row.length));
+        const headers = headerIndex >= 0
+          ? Array.from({ length: columnCount }, (_, i) => String(clean[headerIndex][i] ?? '').trim() || `Columna ${i + 1}`)
+          : Array.from({ length: columnCount }, (_, i) => `Columna ${i + 1}`);
+        const rows = clean.slice(headerIndex >= 0 ? headerIndex + 1 : 0);
+        if (rows.length < 3) throw new Error('No hay suficientes datos debajo de los encabezados.');
+        return { headers, rows, delimiter };
+      }
+
+      function parseDelimitedTable(text) {
+        const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+        if (!lines.length) throw new Error('El archivo CSV está vacío.');
+        let delimiter = null, mostColumns = 1;
+        for (const line of lines.slice(0, 20)) {
+          const candidate = guessDelimiter(line);
+          const columns = splitLine(line, candidate).length;
+          if (columns > mostColumns) { delimiter = candidate; mostColumns = columns; }
+        }
+        return tableFromMatrix(lines.map(line => splitLine(line, delimiter)), delimiter);
+      }
+
+      function guessColumn(headers, names, fallback) {
+        const normalized = headers.map(normalizeHeader);
+        const index = normalized.findIndex(header => names.includes(header));
+        return index >= 0 ? index : Math.min(fallback, headers.length - 1);
+      }
+
+      function fillColumnSelect(select, headers, selectedIndex = -1) {
+        select.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Escoger…';
+        placeholder.selected = selectedIndex < 0;
+        placeholder.disabled = true;
+        select.appendChild(placeholder);
+        headers.forEach((header, index) => {
+          const option = document.createElement('option');
+          option.value = index;
+          option.textContent = `${header} · col. ${index + 1}`;
+          option.selected = index === selectedIndex;
+          select.appendChild(option);
+        });
+      }
+
+      function updateColumnPreview() {
+        if (!state.pending) return;
+        const wireframe = ui.geometryMode.value === 'faces';
+        ui.pointMapping.hidden = wireframe;
+        ui.vertexMapping.hidden = !wireframe;
+        const selects = wireframe ? faceSelects() : [ui.xColumn, ui.yColumn, ui.zColumn];
+        const selections = selects.map(select => select.value);
+        const complete = selections.every(value => value !== '');
+        const unique = complete && new Set(selections).size === 3;
+        const valid = wireframe ? complete && new Set(selections).size === 9 : unique;
+        ui.buildSurface.disabled = !valid;
+        if (!complete) {
+          ui.columnPreview.innerHTML = wireframe
+            ? '<span>Asigna X, Y y Z para los tres vértices del triángulo.</span>'
+            : '<span>Escoge una columna diferente para cada eje.</span>';
+          return;
+        }
+        if (!valid) {
+          ui.columnPreview.innerHTML = '<span class="text-destructive">Cada coordenada debe usar una columna diferente.</span>';
+          return;
+        }
+        const indices = selections.map(Number);
+        const labels = wireframe ? ['Vértice 1', 'Vértice 2', 'Vértice 3'] : ['X', 'Y', 'Z'];
+        const groups = wireframe ? [[0,1,2],[3,4,5],[6,7,8]] : [[0],[1],[2]];
+        const header = `<div class="preview-row">${labels.map(label => `<span><strong>${label}</strong></span>`).join('')}</div>`;
+        const samples = state.pending.rows.slice(0, 3).map(row => `<div class="preview-row">${groups.map(group => `<span>${group.map(i => escapeHtml(row[indices[i]] ?? '—')).join(' · ')}</span>`).join('')}</div>`).join('');
+        ui.columnPreview.innerHTML = header + samples;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
+      }
+
+      function stageTable(table, name) {
+        state.pending = table;
+        state.pendingName = name;
+        fillColumnSelect(ui.xColumn, table.headers);
+        fillColumnSelect(ui.yColumn, table.headers);
+        fillColumnSelect(ui.zColumn, table.headers);
+        const normalized = table.headers.map(normalizeHeader);
+        const detected = faceKeys.map(key => normalized.findIndex(header => faceAliases[key].includes(header)));
+        faceSelects().forEach((select, index) => fillColumnSelect(select, table.headers, detected[index]));
+        ui.geometryMode.value = detected.every(index => index >= 0) ? 'faces' : 'points';
+        ui.pendingRows.textContent = `${table.rows.length.toLocaleString('es-PE')} filas`;
+        ui.mappingPanel.hidden = false;
+        ui.datasetName.textContent = `${name} · pendiente de asignación`;
+        updateColumnPreview();
+        setStatus(ui.geometryMode.value === 'faces' ? 'Wireframe detectado: revisa sus nueve coordenadas' : 'Escoge manualmente las columnas X, Y y Z');
+      }
+
+      function pointsFromMapping() {
+        const indices = [ui.xColumn, ui.yColumn, ui.zColumn].map(select => Number(select.value));
+        if (new Set(indices).size !== 3) throw new Error('X, Y y Z deben usar columnas diferentes.');
+        const raw = [];
+        for (const row of state.pending.rows) {
+          const x = parseNumber(row[indices[0]], state.pending.delimiter);
+          const y = parseNumber(row[indices[1]], state.pending.delimiter);
+          const z = parseNumber(row[indices[2]], state.pending.delimiter);
+          if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) raw.push({ x, y, z });
+        }
+        if (raw.length < 3) throw new Error('La selección no contiene al menos tres filas XYZ válidas.');
+        const grouped = new Map();
+        for (const point of raw) {
+          const key = `${point.x}|${point.y}`;
+          const item = grouped.get(key);
+          if (item) { item.z += point.z; item.count++; }
+          else grouped.set(key, { ...point, count: 1 });
+        }
+        const points = [...grouped.values()].map(point => ({ x: point.x, y: point.y, z: point.z / point.count }));
+        if (points.length < 3) throw new Error('Se necesitan tres posiciones X/Y diferentes para triangular.');
+        return { points, rows: raw.length };
+      }
+
+      function facesFromMapping() {
+        const indices = faceSelects().map(select => Number(select.value));
+        if (new Set(indices).size !== 9) throw new Error('Las nueve coordenadas deben usar columnas diferentes.');
+        const points = [];
+        const triangles = [];
+        const pointIndex = new Map();
+        let validRows = 0;
+
+        function getPoint(x, y, z) {
+          const key = `${x}|${y}|${z}`;
+          if (!pointIndex.has(key)) { pointIndex.set(key, points.length); points.push({ x, y, z }); }
+          return pointIndex.get(key);
+        }
+
+        for (const row of state.pending.rows) {
+          const values = indices.map(index => parseNumber(row[index], state.pending.delimiter));
+          if (!values.every(Number.isFinite)) continue;
+          const triangle = [
+            getPoint(values[0], values[1], values[2]),
+            getPoint(values[3], values[4], values[5]),
+            getPoint(values[6], values[7], values[8])
+          ];
+          if (new Set(triangle).size === 3) { triangles.push(triangle); validRows++; }
+        }
+        if (!triangles.length) throw new Error('No se encontraron triángulos válidos en las columnas seleccionadas.');
+        return { points, triangles, rows: validRows };
+      }
+
+      function circumcircle(a, b, c) {
+        const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        if (Math.abs(d) < 1e-14) return { x: 0, y: 0, r2: -1 };
+        const aa = a.x * a.x + a.y * a.y;
+        const bb = b.x * b.x + b.y * b.y;
+        const cc = c.x * c.x + c.y * c.y;
+        const x = (aa * (b.y - c.y) + bb * (c.y - a.y) + cc * (a.y - b.y)) / d;
+        const y = (aa * (c.x - b.x) + bb * (a.x - c.x) + cc * (b.x - a.x)) / d;
+        const dx = x - a.x, dy = y - a.y;
+        return { x, y, r2: dx * dx + dy * dy };
+      }
+
+      function delaunay(input) {
+        const points = input.map((point, index) => ({ x: point.nx, y: point.ny, index }));
+        const minX = Math.min(...points.map(p => p.x)), maxX = Math.max(...points.map(p => p.x));
+        const minY = Math.min(...points.map(p => p.y)), maxY = Math.max(...points.map(p => p.y));
+        const span = Math.max(maxX - minX, maxY - minY) || 1;
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        const work = points.concat([
+          { x: cx - 24 * span, y: cy - 12 * span, index: points.length },
+          { x: cx, y: cy + 24 * span, index: points.length + 1 },
+          { x: cx + 24 * span, y: cy - 12 * span, index: points.length + 2 }
+        ]);
+        let triangles = [{ a: points.length, b: points.length + 1, c: points.length + 2 }];
+        triangles[0].circle = circumcircle(work[triangles[0].a], work[triangles[0].b], work[triangles[0].c]);
+
+        for (let pi = 0; pi < points.length; pi++) {
+          const point = work[pi];
+          const bad = [];
+          for (let ti = 0; ti < triangles.length; ti++) {
+            const circle = triangles[ti].circle;
+            if (circle.r2 < 0) continue;
+            const dx = point.x - circle.x, dy = point.y - circle.y;
+            if (dx * dx + dy * dy <= circle.r2 + 1e-12) bad.push(ti);
+          }
+          const boundary = new Map();
+          for (const ti of bad) {
+            const t = triangles[ti];
+            for (const [u, v] of [[t.a, t.b], [t.b, t.c], [t.c, t.a]]) {
+              const key = u < v ? `${u},${v}` : `${v},${u}`;
+              if (boundary.has(key)) boundary.delete(key); else boundary.set(key, [u, v]);
+            }
+          }
+          const rejected = new Set(bad);
+          triangles = triangles.filter((_, index) => !rejected.has(index));
+          for (const [u, v] of boundary.values()) {
+            const triangle = { a: u, b: v, c: pi };
+            triangle.circle = circumcircle(work[u], work[v], work[pi]);
+            if (triangle.circle.r2 >= 0) triangles.push(triangle);
+          }
+        }
+        return triangles.filter(t => t.a < points.length && t.b < points.length && t.c < points.length)
+          .map(({ a, b, c }) => [a, b, c]);
+      }
+
+      function prepareData(points, rows, name, explicitTriangles = null) {
+        const xs = points.map(p => p.x), ys = points.map(p => p.y), zs = points.map(p => p.z);
+        const bounds = {
+          minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys),
+          minZ: Math.min(...zs), maxZ: Math.max(...zs)
+        };
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerY = (bounds.minY + bounds.maxY) / 2;
+        const centerZ = (bounds.minZ + bounds.maxZ) / 2;
+        const scale = 2 / (Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) || 1);
+        points.forEach(point => {
+          point.nx = (point.x - centerX) * scale;
+          point.ny = (point.y - centerY) * scale;
+          point.nz = (point.z - centerZ) * scale;
+        });
+
+        setStatus(explicitTriangles ? 'Construyendo wireframe…' : 'Triangulando…');
+        const triangles = explicitTriangles || delaunay(points);
+        const edgeLengths = triangles.map(t => {
+          const a = points[t[0]], b = points[t[1]], c = points[t[2]];
+          return Math.max(Math.hypot(a.x-b.x, a.y-b.y), Math.hypot(b.x-c.x, b.y-c.y), Math.hypot(c.x-a.x, c.y-a.y));
+        }).sort((a, b) => a - b);
+
+        state.points = points;
+        state.triangles = triangles;
+        state.edges = edgeLengths;
+        state.rows = rows;
+        state.bounds = bounds;
+        ui.datasetName.textContent = name;
+        updateFilter();
+        updateStats();
+        fitView();
+        ui.emptyState.style.display = 'none';
+        setStatus('Superficie lista');
+      }
+
+      function updateFilter() {
+        if (!state.triangles.length) return;
+        const percentile = state.edgePercent / 100;
+        const index = Math.min(state.edges.length - 1, Math.max(0, Math.floor(percentile * (state.edges.length - 1))));
+        const threshold = state.edges[index];
+        state.visibleTriangles = state.triangles.filter(t => {
+          const a = state.points[t[0]], b = state.points[t[1]], c = state.points[t[2]];
+          return Math.max(Math.hypot(a.x-b.x, a.y-b.y), Math.hypot(b.x-c.x, b.y-c.y), Math.hypot(c.x-a.x, c.y-a.y)) <= threshold + 1e-9;
+        });
+        ui.triangleStat.textContent = state.visibleTriangles.length.toLocaleString('es-PE');
+        state.dirty = true;
+      }
+
+      function updateStats() {
+        const b = state.bounds;
+        ui.rowCount.textContent = `${state.rows.toLocaleString('es-PE')} filas`;
+        ui.pointStat.textContent = state.points.length.toLocaleString('es-PE');
+        ui.zStat.textContent = `${numberFormat(b.minZ)} – ${numberFormat(b.maxZ)}`;
+        ui.legendMin.textContent = numberFormat(b.minZ);
+        ui.legendMid.textContent = numberFormat((b.minZ + b.maxZ) / 2);
+        ui.legendMax.textContent = numberFormat(b.maxZ);
+      }
+
+      function colorAt(t) {
+        const stops = [[38,59,145],[22,122,184],[31,185,150],[171,214,70],[247,207,69],[240,106,59]];
+        const position = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+        const i = Math.min(stops.length - 2, Math.floor(position));
+        const f = position - i;
+        return stops[i].map((v, channel) => Math.round(v + (stops[i + 1][channel] - v) * f));
+      }
+
+      function project(point, width, height) {
+        const z = point.nz * state.vertical;
+        const cy = Math.cos(state.yaw), sy = Math.sin(state.yaw);
+        const horizontal = sy * point.nx + cy * point.ny;
+        const right = cy * point.nx - sy * point.ny;
+        const ce = Math.cos(state.elevation), se = Math.sin(state.elevation);
+        const screenY = se * horizontal - ce * z;
+        const depth = ce * horizontal + se * z;
+        const scale = Math.min(width, height) * 0.39 * state.zoom;
+        return { x: width / 2 + state.panX + right * scale, y: height / 2 + state.panY + screenY * scale, depth };
+      }
+
+      function normalShade(a, b, c) {
+        const az = a.nz * state.vertical, bz = b.nz * state.vertical, cz = c.nz * state.vertical;
+        const ux = b.nx-a.nx, uy = b.ny-a.ny, uz = bz-az;
+        const vx = c.nx-a.nx, vy = c.ny-a.ny, vz = cz-az;
+        let nx = uy*vz-uz*vy, ny = uz*vx-ux*vz, nz = ux*vy-uy*vx;
+        const length = Math.hypot(nx, ny, nz) || 1; nx/=length; ny/=length; nz/=length;
+        return 0.56 + 0.44 * Math.max(0, nx * -0.35 + ny * -0.25 + nz * 0.9);
+      }
+
+      function drawAxes(width, height) {
+        const b = state.bounds;
+        const origin = { nx: -1, ny: (b.minY - (b.minY+b.maxY)/2) * 2 / Math.max(b.maxX-b.minX, b.maxY-b.minY), nz: (b.minZ-(b.minZ+b.maxZ)/2) * 2 / Math.max(b.maxX-b.minX, b.maxY-b.minY) };
+        const length = .3;
+        const endpoints = [
+          [{ ...origin, nx: origin.nx + length }, 'X', '#ff8a7a'],
+          [{ ...origin, ny: origin.ny + length }, 'Y', '#64d8a4'],
+          [{ ...origin, nz: origin.nz + length / Math.max(state.vertical, .001) }, 'Z', '#55b9ff']
+        ];
+        const o = project(origin, width, height);
+        ctx.save(); ctx.lineWidth = 2; ctx.font = '600 11px system-ui';
+        for (const [point, label, color] of endpoints) {
+          const p = project(point, width, height);
+          ctx.strokeStyle = color; ctx.fillStyle = color;
+          ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+          ctx.fillText(label, p.x + 5, p.y - 4);
+        }
+        ctx.restore();
+      }
+
+      function render() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(1, Math.floor(rect.width)), height = Math.max(1, Math.floor(rect.height));
+        if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+          canvas.width = Math.floor(width * dpr); canvas.height = Math.floor(height * dpr);
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        if (!state.points.length) return;
+
+        const projected = state.points.map(point => project(point, width, height));
+        const zRange = state.bounds.maxZ - state.bounds.minZ || 1;
+        const faces = state.visibleTriangles.map(indices => {
+          const p = indices.map(i => projected[i]);
+          return { indices, p, depth: (p[0].depth + p[1].depth + p[2].depth) / 3 };
+        }).sort((a, b) => a.depth - b.depth);
+
+        ctx.lineJoin = 'round';
+        for (const face of faces) {
+          const [ia, ib, ic] = face.indices;
+          const a = state.points[ia], b = state.points[ib], c = state.points[ic];
+          const elevation = (a.z + b.z + c.z) / 3;
+          const base = colorAt((elevation - state.bounds.minZ) / zRange);
+          const shade = normalShade(a, b, c);
+          const rgb = base.map(value => Math.round(value * shade));
+          ctx.beginPath();
+          ctx.moveTo(face.p[0].x, face.p[0].y); ctx.lineTo(face.p[1].x, face.p[1].y); ctx.lineTo(face.p[2].x, face.p[2].y); ctx.closePath();
+          ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`; ctx.fill();
+          if (ui.showMesh.checked) { ctx.strokeStyle = 'rgba(225,242,251,.24)'; ctx.lineWidth = .7; ctx.stroke(); }
+        }
+
+        if (ui.showPoints.checked) {
+          ctx.fillStyle = '#f2fbff'; ctx.strokeStyle = 'rgba(7,16,25,.8)'; ctx.lineWidth = 1;
+          for (const point of projected) { ctx.beginPath(); ctx.arc(point.x, point.y, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+        }
+        drawAxes(width, height);
+      }
+
+      function animationLoop() {
+        if (state.dirty) { render(); state.dirty = false; }
+        requestAnimationFrame(animationLoop);
+      }
+
+      function fitView() { state.zoom = 1; state.panX = 0; state.panY = 18; state.dirty = true; }
+
+      async function loadDelimited(text, name) {
+        try {
+          setStatus('Leyendo columnas…');
+          stageTable(parseDelimitedTable(text), name);
+        } catch (error) { setStatus(error.message || 'No se pudo leer el archivo.', true); }
+      }
+
+      function stageWorkbookSheet(sheetName) {
+        const sheet = state.workbook.Sheets[sheetName];
+        const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null, blankrows: false });
+        stageTable(tableFromMatrix(matrix), `${state.workbookName} · ${sheetName}`);
+      }
+
+      async function loadWorkbook(file) {
+        if (!window.XLSX) throw new Error('No se pudo iniciar el lector XLSX.');
+        const data = await file.arrayBuffer();
+        state.workbook = XLSX.read(data, { type: 'array', cellDates: false });
+        if (!state.workbook.SheetNames.length) throw new Error('El libro no contiene hojas.');
+        state.workbookName = file.name;
+        ui.sheetSelect.innerHTML = '';
+        state.workbook.SheetNames.forEach(name => {
+          const option = document.createElement('option'); option.value = name; option.textContent = name; ui.sheetSelect.appendChild(option);
+        });
+        ui.sheetControl.hidden = state.workbook.SheetNames.length < 2;
+        stageWorkbookSheet(state.workbook.SheetNames[0]);
+      }
+
+      function syntheticExample() {
+        const points = [];
+        const count = 20;
+        for (let iy = 0; iy < count; iy++) for (let ix = 0; ix < count; ix++) {
+          const x = ix * 5 + Math.sin(iy * .7) * .45;
+          const y = iy * 5 + Math.cos(ix * .6) * .45;
+          const hill = 22 * Math.exp(-((x-56)**2 + (y-48)**2) / 900);
+          const valley = 11 * Math.exp(-((x-28)**2 + (y-68)**2) / 420);
+          const z = 350 + hill - valley + Math.sin(x*.11)*2.4 + Math.cos(y*.09)*1.8;
+          points.push({ x, y, z });
+        }
+        prepareData(points, points.length, 'Ejemplo sintético · importa tu archivo XYZ');
+        setStatus('Ejemplo listo');
+      }
+
+      async function loadLocalSample() {
+        try {
+          setStatus('Abriendo galería de ejemplo…');
+          const response = await fetch('./elementos/galeria_wireframe_simulada.csv', { cache: 'no-store' });
+          if (!response.ok) throw new Error();
+          ui.sheetControl.hidden = true;
+          state.workbook = null;
+          await loadDelimited(await response.text(), 'elementos/galeria_wireframe_simulada.csv');
+        } catch {
+          setStatus('Usa “Importar CSV / XLSX” para abrir elementos/galeria_wireframe_simulada.csv.', true);
+        }
+      }
+
+      ui.openFile.addEventListener('click', () => ui.fileInput.click());
+      ui.fileInput.addEventListener('change', async event => {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 20 * 1024 * 1024) { setStatus('El archivo supera el límite de 20 MB.', true); return; }
+        try {
+          const extension = file.name.split('.').pop().toLowerCase();
+          if (extension === 'xlsx') await loadWorkbook(file);
+          else {
+            state.workbook = null; ui.sheetControl.hidden = true;
+            await loadDelimited(await file.text(), file.name);
+          }
+        } catch (error) { setStatus(error.message || 'No se pudo abrir el archivo.', true); }
+        event.target.value = '';
+      });
+      [ui.xColumn, ui.yColumn, ui.zColumn, ...faceSelects()].forEach(select => select.addEventListener('change', updateColumnPreview));
+      ui.geometryMode.addEventListener('change', updateColumnPreview);
+      ui.sheetSelect.addEventListener('change', event => stageWorkbookSheet(event.target.value));
+      ui.buildSurface.addEventListener('click', () => {
+        try {
+          setStatus('Validando columnas…');
+          const wireframe = ui.geometryMode.value === 'faces';
+          const parsed = wireframe ? facesFromMapping() : pointsFromMapping();
+          setTimeout(() => {
+            try { prepareData(parsed.points, parsed.rows, state.pendingName, parsed.triangles || null); }
+            catch (error) { setStatus(error.message || 'No se pudo triangular el archivo.', true); }
+          }, 10);
+        } catch (error) { setStatus(error.message || 'Revisa las columnas seleccionadas.', true); }
+      });
+      ui.sampleFile.addEventListener('click', loadLocalSample);
+      ui.verticalScale.addEventListener('input', event => {
+        state.vertical = Number(event.target.value); ui.verticalOut.value = `${state.vertical.toFixed(1)}×`; state.dirty = true;
+      });
+      ui.edgeFilter.addEventListener('input', event => {
+        state.edgePercent = Number(event.target.value); ui.edgeOut.value = `${state.edgePercent}%`; updateFilter();
+      });
+      ui.showMesh.addEventListener('change', () => state.dirty = true);
+      ui.showPoints.addEventListener('change', () => state.dirty = true);
+      ui.isoView.addEventListener('click', () => { state.yaw = -.72; state.elevation = .52; state.dirty = true; });
+      ui.topView.addEventListener('click', () => { state.elevation = Math.PI / 2; state.yaw = 0; state.dirty = true; });
+      ui.fitView.addEventListener('click', fitView);
+
+      canvas.addEventListener('pointerdown', event => {
+        canvas.setPointerCapture(event.pointerId); state.dragging = true; state.panning = event.shiftKey || event.button === 2;
+        state.lastX = event.clientX; state.lastY = event.clientY; canvas.classList.add('dragging');
+      });
+      canvas.addEventListener('pointermove', event => {
+        if (!state.dragging) return;
+        const dx = event.clientX - state.lastX, dy = event.clientY - state.lastY;
+        state.lastX = event.clientX; state.lastY = event.clientY;
+        if (state.panning || event.shiftKey) { state.panX += dx; state.panY += dy; }
+        else { state.yaw += dx * .008; state.elevation = Math.max(.08, Math.min(Math.PI / 2, state.elevation - dy * .007)); }
+        state.dirty = true;
+      });
+      const stopDrag = () => { state.dragging = false; canvas.classList.remove('dragging'); };
+      canvas.addEventListener('pointerup', stopDrag); canvas.addEventListener('pointercancel', stopDrag);
+      canvas.addEventListener('contextmenu', event => event.preventDefault());
+      canvas.addEventListener('wheel', event => {
+        event.preventDefault(); state.zoom = Math.max(.25, Math.min(8, state.zoom * Math.exp(-event.deltaY * .001))); state.dirty = true;
+      }, { passive: false });
+      window.addEventListener('resize', () => state.dirty = true);
+
+      syntheticExample();
+      animationLoop();
+    })();
+  </script>
+</body>
+</html>

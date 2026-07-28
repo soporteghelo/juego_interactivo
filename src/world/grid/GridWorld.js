@@ -60,7 +60,15 @@ export class GridWorld extends WorldRuntime {
       if (seg.skipBounds) continue;
       seg.group.updateMatrixWorld(true);
       seg._invMatrix = new THREE.Matrix4().copy(seg.group.matrixWorld).invert();
-      if (seg.type === 'node' || seg.type === 'room') {
+      if (seg.terminalLabor) {
+        // Fondo de saco de seccion constante, centrado en el antiguo nodo de sala. Su eje puede
+        // correr por X o por Z segun la direccion del acceso.
+        const d = seg.openDirs?.[0] || { x: 0, z: 1 };
+        const axisX = Math.abs(d.x) >= Math.abs(d.z);
+        seg._localBounds = axisX
+          ? { hx: seg.length / 2, zMin: -seg.width / 2, zMax: seg.width / 2, top: seg.height }
+          : { hx: seg.width / 2, zMin: -seg.length / 2, zMax: seg.length / 2, top: seg.height };
+      } else if (seg.type === 'node' || seg.type === 'room') {
         // Bloques CENTRADos en su posicion (caja simetrica en X y Z).
         seg._localBounds = { hx: seg.size / 2, zMin: -seg.size / 2, zMax: seg.size / 2, top: seg.height };
       } else {
@@ -101,12 +109,13 @@ export class GridWorld extends WorldRuntime {
         return true;
       }
 
-      // Dentro de un nicho/bahía el jugador puede estar mucho más allá del ancho del túnel
-      // (misma tolerancia que el BoundsGuard lineal: hasta 22 m hacia el lado registrado).
+      // Dentro de un nicho/bahía el jugador puede entrar lateralmente SOLO hasta la profundidad
+      // real del receso (`maxLat`). Antes se toleraban 22 m fijos: si un receso quedaba con un
+      // hueco en su colisión, el jugador se "salía del mapa" sin que el guard lo recuperara.
       if (seg.nichoZones && Math.abs(l.x) > b.hx) {
         const side = l.x > 0 ? 1 : -1;
         for (const z of seg.nichoZones) {
-          if (z.side === side && l.z >= z.zMin && l.z <= z.zMax && Math.abs(l.x) < b.hx + 22) {
+          if (z.side === side && l.z >= z.zMin && l.z <= z.zMax && Math.abs(l.x) < b.hx + (z.maxLat ?? 2.5)) {
             return true;
           }
         }

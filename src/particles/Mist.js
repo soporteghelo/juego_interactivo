@@ -40,6 +40,10 @@ export class MistSystem {
     }
     this.group.visible = this.enabled;
     scene.add(this.group);
+    settings.onChange((quality) => {
+      this.enabled = quality.particleDensity > 0.25 && !Device.isTouch;
+      this.group.visible = this.enabled;
+    });
   }
 
   /** Textura suave radial para difuminar los planos. */

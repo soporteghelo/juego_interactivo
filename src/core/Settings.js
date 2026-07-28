@@ -134,9 +134,12 @@ class SettingsState {
     this.controlScheme = 'desktop';
     // Semilla del mundo procedural (compartible para reproducir escenarios).
     this.worldSeed = (Math.random() * 0xffffffff) >>> 0;
-    // Modo de mundo: 'grid' POR DEFECTO — la mina COMPLETA del plano (galerías + cruceros +
-    // vía principal RN 96 + rampas a otro nivel + labores especiales). El corredor lineal
-    // antiguo solo con `?mapa=linear`.
+    // Modo de mundo POR DEFECTO: 'grid' — la mina JUGABLE (retícula del plano: galerías, cruceros,
+    // vía principal RN 96, rampas, labores especiales) con toda la capa operacional (nichos,
+    // bermas, cunetas, sostenimiento, equipos, refugios Dräger, señalética). Es la que "INGRESAR
+    // A LA MINA" carga. Alternativas por URL: `?mapa=complete` (la malla CSV maestra 3D — pesada y
+    // pensada como VISOR: solo muestra un tramo a la vez) y `?mapa=linear` (corredor lineal antiguo).
+    // La mina CSV 3D completa se explora mejor desde "VER MINA COMPLETA 3D" (mina-completa.html).
     this.worldMode = this._readWorldMode();
     this.audioEnabled = true;
     // Luminosidad de la mina: multiplicador aplicado a todas las luces de galeria
@@ -152,21 +155,24 @@ class SettingsState {
   }
 
   /**
-   * Lee el modo de mundo del parametro `?mapa=` de la URL ('grid'|'linear').
-   * Por DEFECTO el mundo es la retICula COMPLETA del plano (galerias + cruceros + rampas +
-   * labores); el corredor lineal antiguo queda disponible solo con `?mapa=linear`.
+   * Lee el modo de mundo del parametro `?mapa=` de la URL.
+   * Por DEFECTO (sin parametro) el mundo es 'grid' (la mina JUGABLE del plano, con toda la capa
+   * operacional). `?mapa=complete` fuerza la malla CSV maestra 3D (visor pesado); `?mapa=linear`
+   * el corredor lineal antiguo.
    */
   _readWorldMode() {
     try {
       const p = new URLSearchParams(window.location.search).get('mapa');
       if (p === 'linear' || p === 'lineal') return 'linear';
+      if (p === 'complete' || p === 'completa') return 'complete';
+      if (p === 'grid' || p === 'reticula') return 'grid';
     } catch { /* SSR/entorno sin window: usa el valor por defecto */ }
     return 'grid';
   }
 
-  /** Fija el modo de mundo ('linear'|'grid'). */
+  /** Fija el modo de mundo ('grid'|'complete'|'linear'); cualquier otro valor cae a 'grid'. */
   setWorldMode(key) {
-    this.worldMode = key === 'grid' ? 'grid' : 'linear';
+    this.worldMode = (key === 'complete' || key === 'linear') ? key : 'grid';
   }
 
   /** Aplica un preset por clave ('alto'|'medio'|'movil'|'bajo'). */

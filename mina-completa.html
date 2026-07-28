@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#090b0c" />
+  <title>Mina completa 3D · Simulador</title>
+  <link rel="stylesheet" href="/src/complete-mine/complete-mine.css" />
+</head>
+<body>
+  <main id="mine-app" aria-label="Visualización tridimensional de la mina completa">
+    <canvas id="mine-canvas"></canvas>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SIMULADOR · MODELO OPERACIONAL 1:1</p>
+        <h1>Mina completa 3D</h1>
+      </div>
+      <nav class="toolbar" aria-label="Controles de cámara">
+        <button type="button" data-view="general">General</button>
+        <button type="button" data-view="planta">Planta</button>
+        <button type="button" data-view="perfil">Perfil</button>
+        <button type="button" id="wireframe-toggle" aria-pressed="false">Triangulación</button>
+        <button type="button" id="services-toggle" aria-pressed="true">Servicios</button>
+        <a href="/" class="back-link">Volver al simulador</a>
+      </nav>
+    </header>
+
+    <aside class="mine-panel" aria-label="Catálogo de labores">
+      <section class="stats" aria-label="Resumen del modelo">
+        <div><strong id="stat-elements">54</strong><span>emplazamientos</span></div>
+        <div><strong id="stat-triangles">—</strong><span>triángulos</span></div>
+        <div><strong id="stat-size">—</strong><span>extensión</span></div>
+      </section>
+
+      <label class="cut-control" for="elevation-cut">
+        <span>Corte máximo por cota</span>
+        <output id="elevation-value">Modelo completo</output>
+        <input id="elevation-cut" type="range" min="-112" max="26" value="26" step="1" />
+      </label>
+
+      <div class="catalog-heading">
+        <div>
+          <p class="eyebrow">SELECCIÓN</p>
+          <h2>Labores de mina</h2>
+        </div>
+        <button type="button" id="focus-all">Ver todas</button>
+      </div>
+      <div id="mine-list" class="mine-list"></div>
+    </aside>
+
+    <div class="selection" id="selection-detail" aria-live="polite">
+      Selecciona una labor para aislar su ubicación y dimensiones.
+    </div>
+
+    <div class="legend" aria-label="Leyenda de materiales">
+      <span><i class="rock"></i>Roca</span>
+      <span><i class="support"></i>Sostenimiento</span>
+      <span><i class="service"></i>Servicios</span>
+      <span><i class="floor"></i>Piso y drenaje</span>
+    </div>
+
+    <div class="loading" id="loading-screen" role="status" aria-live="polite">
+      <div class="loading-card">
+        <p class="eyebrow">ENSAMBLANDO GEOMETRÍA CSV</p>
+        <strong id="loading-label">Descargando mina completa…</strong>
+        <div class="loading-track"><span id="loading-progress"></span></div>
+        <small>54 emplazamientos · 34 geometrías fuente · coordenadas reales · sin reescalado</small>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="/src/complete-mine/complete-mine.js"></script>
+</body>
+</html>

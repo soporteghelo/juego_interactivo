@@ -181,6 +181,29 @@ export class RecorridoGuiado {
     return this._pausado;
   }
 
+  /**
+   * Fija el estado de pausa (a diferencia de `alternarPausa`, que lo invierte).
+   * Lo usa la selección por doble clic: si el usuario pide ver una pieza, el
+   * recorrido debe quedarse en ella y no seguir avanzando solo.
+   * @param {boolean} valor
+   */
+  pausar(valor = true) {
+    if (!this._activo) return false;
+    this._pausado = !!valor;
+    return this._pausado;
+  }
+
+  /** Índice del paso que presenta ese grupo, o −1. */
+  indiceDe(grupo) {
+    if (!this._activo || !grupo) return -1;
+    return this.pasos.findIndex((p) => p.grupo === grupo);
+  }
+
+  /** Grupo que se está presentando ahora mismo (null en las vistas generales). */
+  get grupoActual() {
+    return this._activo ? (this.pasos[this.i]?.grupo ?? null) : null;
+  }
+
   // ══════════════════════════════════════════════════════════════════════
   //  BUCLE
   // ══════════════════════════════════════════════════════════════════════

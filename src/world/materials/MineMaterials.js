@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   texturaRoca, texturaShotcrete, texturaBarro, texturaLodo, texturaMetal, texturaGrunge,
   texturaRocaTunel, texturaRocaTunelNormal, texturaRocaTunelRough, texturaAguaNormal,
-  texturaOxidoEscurrido
+  texturaOxidoEscurrido, texturaManga
 } from './Texturas.js';
 
 /**
@@ -267,6 +267,20 @@ class MaterialLibrary {
   ventNaranja() {
     return this._get('ventN', () =>
       new THREE.MeshStandardMaterial({ color: PALETTE.ventNaranja, map: texturaGrunge(), roughness: 0.8, metalness: 0.1, envMapIntensity: 0.3 })
+    );
+  }
+
+  /**
+   * MANGA DE VENTILACION en labor: naranja con SALPICADURA BLANCA DE SHOTCRETE y costura
+   * helicoidal. `color: 0xffffff` a proposito — el naranja va horneado en la textura, porque un
+   * `color` naranja multiplicaria la salpicadura y la volveria naranja tambien. La manga es de
+   * lona plastificada: mate, sin brillo metalico.
+   */
+  mangaVent() {
+    return this._get('mangaVent', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, map: texturaManga(), roughness: 0.88, metalness: 0.0, envMapIntensity: 0.22
+      })
     );
   }
 

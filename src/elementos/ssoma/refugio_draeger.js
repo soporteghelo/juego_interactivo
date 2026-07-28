@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { MineMaterials, PALETTE } from '../../world/materials/MineMaterials.js';
 import { sub } from '../_comun/subelemento.js';
 
@@ -361,9 +362,23 @@ function _texturaPuertaSalida() {
   ctx.fillStyle = '#1c1c1a';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  // "SALIDA" arriba y "EXIT" bajo el ojo de buey
+  // "SALIDA" CURVADO siguiendo el aro del ojo de buey (así está pintado con plantilla en la
+  // foto: cada letra girada sobre el arco) y "EXIT" recto justo debajo del ojo.
   ctx.font = 'bold 62px Arial, sans-serif';
-  ctx.fillText('SALIDA', 256, 74);
+  ctx.textBaseline = 'middle';
+  const arco = 1.15, radio = 210, cyOjo = 250;      // centro del ojo de buey en el lienzo
+  const salida = 'SALIDA';
+  ctx.save();
+  ctx.translate(256, cyOjo);
+  for (let i = 0; i < salida.length; i++) {
+    const a = -arco / 2 + (arco / (salida.length - 1)) * i;
+    ctx.save();
+    ctx.rotate(a);
+    ctx.fillText(salida[i], 0, -radio);
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.textBaseline = 'alphabetic';
   ctx.font = 'bold 58px Arial, sans-serif';
   ctx.fillText('EXIT', 256, 378);
   // Flechas negras de GIRO DE LA MANIJA: cola a la izquierda, codo y punta
@@ -493,6 +508,113 @@ function _texturaPlaca(titulo, colorTitulo = '#1a1a1a') {
     const w = 200 - Math.floor(Math.random() * 70);
     ctx.fillRect(28, y, w, 6);
   }
+  return canvas;
+}
+
+/**
+ * PLACA DE IDENTIFICACIÓN "Dräger | SIMSA — MRC 5000" del fabricante: chapa metálica grabada
+ * con modelo, capacidad, autonomía, presión y número de serie, más el triángulo de advertencia.
+ * En las fotos va atornillada al mamparo de la precámara, junto a la puerta interior: es lo
+ * primero que identifica al equipo y su capacidad ante una inspección.
+ */
+function _texturaPlacaMRC() {
+  const W = 420, Hh = 250;
+  const { canvas, ctx } = _lienzo(W, Hh);
+  ctx.fillStyle = '#cfd0cc'; ctx.fillRect(0, 0, W, Hh);
+  // Veteado de chapa cepillada.
+  for (let i = 0; i < 130; i++) {
+    ctx.strokeStyle = `rgba(${140 + Math.random() * 60 | 0},${142 + Math.random() * 60 | 0},${140 + Math.random() * 60 | 0},0.22)`;
+    ctx.lineWidth = 1;
+    const y = Math.random() * Hh;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.strokeStyle = '#8d8e8a'; ctx.lineWidth = 3;
+  ctx.strokeRect(5, 5, W - 10, Hh - 10);
+
+  ctx.fillStyle = '#1b1b18';
+  ctx.font = 'bold 30px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('MRC 5000', 22, 44);
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 26px Georgia, serif';
+  ctx.fillText('Dräger', W - 108, 42);
+  ctx.fillStyle = '#6d6e6a';
+  ctx.fillRect(W - 100, 20, 2, 28);
+  ctx.fillStyle = '#1b1b18';
+  ctx.font = 'bold 24px Arial, sans-serif';
+  ctx.fillText('SIMSA', W - 22, 42);
+
+  ctx.fillStyle = '#3a3a35';
+  ctx.font = '15px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  const filas = [
+    'CÁMARA DE RESCATE MINERO',
+    'CAPACIDAD: 20 PERSONAS / 96 HORAS',
+    'DIMENSIONES: 6.00 × 2.94 × 2.85 m (ext.)',
+    'PRESIÓN DE TRABAJO: 0.5 mbar (sobrepresión)',
+    'AÑO DE FABRICACIÓN: 2024',
+    'N° DE SERIE: 5000-MRC-24-018'
+  ];
+  filas.forEach((f, i) => ctx.fillText(f, 22, 82 + i * 22));
+
+  // Triángulo de advertencia + remisión al manual.
+  ctx.strokeStyle = '#1b1b18'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(W - 62, 168); ctx.lineTo(W - 30, 222); ctx.lineTo(W - 94, 222);
+  ctx.closePath(); ctx.stroke();
+  ctx.fillStyle = '#1b1b18';
+  ctx.font = 'bold 26px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('!', W - 62, 214);
+  return canvas;
+}
+
+/**
+ * MATTING PERFORADO antideslizante del piso de la esclusa (fotos reales): plancha de goma
+ * oscura con perforación en tresbolillo. El piso de la precámara es lo que más se moja al
+ * entrar con el EPP empapado, por eso es perforado y no liso — el agua escurre bajo la plancha.
+ * Se repite por metro, así que el patrón se dibuja aquí a escala de baldosa.
+ */
+function _texturaMatting() {
+  const S = 128;
+  const { canvas, ctx } = _lienzo(S, S);
+  ctx.fillStyle = '#3a3a37'; ctx.fillRect(0, 0, S, S);
+  const paso = 16;
+  for (let fila = 0; fila * paso <= S; fila++) {
+    for (let col = -1; col * paso <= S + paso; col++) {
+      const x = col * paso + (fila % 2 ? paso / 2 : 0);
+      const y = fila * paso;
+      // Hueco oscuro + reborde claro: la perforación tiene canto biselado que atrapa la luz.
+      ctx.fillStyle = '#4e4e4a';
+      ctx.beginPath(); ctx.arc(x, y, 5.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#141413';
+      ctx.beginPath(); ctx.arc(x, y, 4.2, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  return canvas;
+}
+
+/**
+ * RÓTULO DE TOLVA de la BPU: banda NARANJA con el texto en blanco sobre el frente azul de cada
+ * tolva de carga. Identifica qué consumible lleva cada una — se rellenan a mano durante el
+ * encierro y confundirlas dejaría la atmósfera sin tratar, por eso van rotuladas en alto
+ * contraste. Una o dos líneas según el texto.
+ */
+function _texturaTolva(lineas) {
+  const W = 340, Hh = 96;
+  const { canvas, ctx } = _lienzo(W, Hh);
+  ctx.fillStyle = '#e2620f'; ctx.fillRect(0, 0, W, Hh);
+  ctx.strokeStyle = '#8f3c06'; ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, W - 4, Hh - 4);
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const arr = Array.isArray(lineas) ? lineas : [lineas];
+  const tam = arr.length > 1 ? 26 : 32;
+  ctx.font = `bold ${tam}px Arial, sans-serif`;
+  arr.forEach((ln, i) => {
+    ctx.fillText(ln, W / 2, Hh / 2 + (i - (arr.length - 1) / 2) * (tam + 6));
+  });
   return canvas;
 }
 
@@ -2255,6 +2377,17 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   rotulo.rotation.y = Math.PI / 2;
   rotulo.position.set(0.037, puertaH / 2, -puertaW / 2);
   puertaPivote.add(rotulo);
+  // ── Cara INTERIOR de esta misma hoja: "SALIDA / EXIT" + flechas de giro de manija ──
+  //  Va AQUÍ y no en la puerta interior: ésta es la hoja por la que se SALE del refugio, y el
+  //  rótulo tiene que leerse desde dentro de la esclusa, que es donde está quien va a salir.
+  //  La cara exterior lleva "ENTRADA / ENTRY" (ver `_texturaPuerta`): una cara por sentido.
+  const rotuloSalida = new THREE.Mesh(
+    new THREE.PlaneGeometry(puertaW - 0.06, puertaH - 0.06),
+    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPuertaSalida()), transparent: true, roughness: 0.6 })
+  );
+  rotuloSalida.rotation.y = -Math.PI / 2;
+  rotuloSalida.position.set(-0.037, puertaH / 2, -puertaW / 2);
+  puertaPivote.add(rotuloSalida);
   // ojo de buey (porthole)
   const anilloVentana = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 10, 20), mMarco);
   anilloVentana.rotation.y = Math.PI / 2;
@@ -2439,14 +2572,8 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   hojaInt.position.set(0, puertaH / 2, -puertaW / 2);
   hojaInt.castShadow = true;
   puertaIntPivote.add(hojaInt);
-  // rotulación "SALIDA / EXIT" en la cara que mira a la cámara principal
-  const rotuloSalida = new THREE.Mesh(
-    new THREE.PlaneGeometry(puertaW - 0.06, puertaH - 0.06),
-    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPuertaSalida()), transparent: true, roughness: 0.6 })
-  );
-  rotuloSalida.rotation.y = -Math.PI / 2;
-  rotuloSalida.position.set(-0.032, puertaH / 2, -puertaW / 2);
-  puertaIntPivote.add(rotuloSalida);
+  // (El rótulo "SALIDA / EXIT" NO va aquí: esta hoja comunica la esclusa con la cámara, no con
+  //  el exterior. Está en la cara interior de la PUERTA EXTERIOR, que es por la que se sale.)
   // ── OJO DE BUEY (foto real): brida blanca atornillada con 12 pernos,
   //    aro interior de bronce y vidrio oscuro apenas velado por la luz
   //    de la precámara al otro lado ─────────────────────────────────
@@ -2539,23 +2666,63 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     bisInt.position.set(-0.045, hy, -0.015);
     puertaIntPivote.add(bisInt);
   }
-  // ── Lámparas DORADAS de emergencia flanqueando la puerta (foto) ───
+  // ── LUMINARIAS DE MAMPARO (bulkhead) flanqueando la puerta ────────
+  //  Foto real: luminaria marina de BRONCE — base roscada, tubo de vidrio acanalado y JAULA
+  //  protectora de varillas, alimentada por un CODO DE CONDUIT blanco que sale del mamparo.
+  //  Es el tipo antideflagrante que se usa en atmósferas con gas: por eso lleva jaula y vidrio
+  //  grueso en vez de un difusor de plástico. Antes eran cilindro + esfera dorados.
+  const mBronce = MineMaterials.plano(0x9c7328, { rough: 0.42, metal: 0.78 });
+  const mVidrioLamp = new THREE.MeshStandardMaterial({
+    color: 0xf6efd8, emissive: 0xffdc96, emissiveIntensity: 1.7,
+    roughness: 0.35, metalness: 0.0, transparent: true, opacity: 0.9
+  });
+  //  Van en las ESQUINAS ALTAS DE LA ESCLUSA, no en la cámara principal: es donde están en las
+  //  fotos, y es lo lógico —la esclusa no recibe luz de la cámara con la puerta cerrada, así que
+  //  necesita alumbrado propio para poder operar el volante y leer los carteles a oscuras.
   for (const szL of [-1, 1]) {
     const lampara = new THREE.Group();
-    lampara.position.set(xBulk - 0.1, y0 + H - 0.38, doorZ + szL * 0.78);
-    lampara.rotation.z = 0.5; // inclinadas hacia la cámara
+    lampara.position.set(xBulk + 0.34, y0 + H - 0.34, szL * (A / 2 - t - 0.15));
+    lampara.rotation.set(0, 0, 0.5);
+    lampara.rotation.x = -szL * 0.42;             // volcadas hacia el centro de la esclusa
     S.add(lampara);
-    const cuerpoLamp = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.045, 0.055, 0.17, 10),
-      MineMaterials.plano(0xb08a2a, { rough: 0.35, metal: 0.7 })
+    // Codo de conduit BLANCO que baja del mamparo y entra a la base (foto 2).
+    const codo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.075, 0.016, 6, 12, Math.PI / 2),
+      MineMaterials.plano(0xe8e6dd, { rough: 0.55, metal: 0.1 })
     );
-    lampara.add(cuerpoLamp);
-    const focoLamp = new THREE.Mesh(
-      new THREE.SphereGeometry(0.035, 8, 6),
-      MineMaterials.plano(0xffe9b0, { rough: 0.3, emissive: 0xffcc55, emissiveIntensity: 1.6 })
-    );
-    focoLamp.position.y = -0.1;
-    lampara.add(focoLamp);
+    codo.rotation.set(Math.PI / 2, 0, 0);
+    codo.position.set(0.075, 0.155, 0);
+    lampara.add(codo);
+    // Base roscada de bronce.
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.050, 0.058, 0.075, 12), mBronce);
+    base.position.y = 0.045;
+    lampara.add(base);
+    // Anillos de la rosca (el bronce de la foto muestra el roscado marcado).
+    for (const ry of [0.022, 0.048, 0.072]) {
+      const anillo = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.006, 5, 14), mBronce);
+      anillo.rotation.x = Math.PI / 2;
+      anillo.position.y = ry;
+      lampara.add(anillo);
+    }
+    // Tubo de vidrio acanalado.
+    const tubo = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.115, 12), mVidrioLamp);
+    tubo.position.y = -0.045;
+    lampara.add(tubo);
+    // Jaula: varillas longitudinales + aro de remate inferior.
+    const mJaula = MineMaterials.plano(0x8e8b82, { rough: 0.5, metal: 0.7 });
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const varilla = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.125, 4), mJaula);
+      varilla.position.set(Math.cos(a) * 0.047, -0.045, Math.sin(a) * 0.047);
+      lampara.add(varilla);
+    }
+    const aroFin = new THREE.Mesh(new THREE.TorusGeometry(0.047, 0.005, 5, 14), mJaula);
+    aroFin.rotation.x = Math.PI / 2;
+    aroFin.position.y = -0.106;
+    lampara.add(aroFin);
+    const tapaFin = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.036, 0.020, 12), mBronce);
+    tapaFin.position.y = -0.118;
+    lampara.add(tapaFin);
   }
   // etiquetas blancas pequeñas sobre el dintel (foto: "VÁLVULA DE SOBREPRESIÓN")
   for (const szE of [-1, 1]) {
@@ -2568,11 +2735,16 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     S.add(etiq);
   }
 
-  // piso de rejilla antideslizante de la esclusa + placa "PRECÁMARA"
-  const grating = new THREE.Mesh(
-    new THREE.BoxGeometry(L / 2 - xBulk - 0.1, 0.02, A - 0.16),
-    MineMaterials.plano(0x6f6e66, { rough: 0.9, metal: 0.3 })
-  );
+  // ── PISO: plancha de MATTING PERFORADO antideslizante de la esclusa ──
+  //  Es el punto donde entra el personal chorreando agua y barro con el EPP puesto, así que el
+  //  piso va perforado (el agua escurre por debajo) y no liso. La textura se repite a escala
+  //  MÉTRICA para que el paso de la perforación mida lo mismo aquí que en cualquier otro sitio.
+  const preLargo = L / 2 - xBulk - 0.1, preAncho = A - 0.16;
+  const matGrating = new THREE.MeshStandardMaterial({
+    map: _aTextura(_texturaMatting(), preLargo / 0.30, preAncho / 0.30),
+    color: 0xa8a8a2, roughness: 0.86, metalness: 0.18
+  });
+  const grating = new THREE.Mesh(new THREE.BoxGeometry(preLargo, 0.02, preAncho), matGrating);
   grating.position.set((xBulk + L / 2) / 2, y0 + t + 0.011, 0);
   S.add(grating);
   const placaPre = new THREE.Mesh(
@@ -2583,18 +2755,87 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   placaPre.rotation.y = Math.PI / 2;
   S.add(placaPre);
 
-  // ── Cartel "INSTRUCCIONES PARA EL USO DEL BAÑO QUÍMICO" (foto real) ──
-  //  Va en el costado +Z de la esclusa, bajo la tubería aérea, plastificado
-  //  y sujeto por cuatro remaches en las esquinas.
+  // ════════════════════════════════════════════════════════════════
+  //  CUARTO DEL BAÑO — tabique con PUERTA CORREDIZA EMBUTIDA
+  // ════════════════════════════════════════════════════════════════
+  //  El baño NO es un vano abierto: es un cuartito cerrado por un TABIQUE con puerta CORREDIZA.
+  //  Corrediza y no abatible porque en una esclusa de 1 m de fondo una hoja batiente chocaría
+  //  con las puertas estancas y con quien esté esperando el purgado.
+  //
+  //  La hoja corre EMBUTIDA en el propio tabique (puerta de bolsillo), de modo que al abrirse
+  //  desaparece dentro de él y deja el vano libre; en la foto solo asoma su canto de arrastre en
+  //  el borde del hueco. Eso es lo que mantiene EXPUESTA la PARTE FIJA del tabique, que es donde
+  //  va atornillada la placa de identificación Dräger | SIMSA del refugio.
+  const zPre  = A / 2 - t / 2 - 0.006;   // cara interna del costado +Z (fondo del cuarto)
+  const zTab  = A / 2 - t - 0.62;        // cara del tabique → cuarto de 0.62 m de fondo
+  const xTabA = xBulk + 0.06, xTabB = L / 2 - 0.02;
+  const xVanoA = xTabA + 0.07, xVanoB = xTabA + 0.61;   // hueco de paso (0.54 m)
+  const hVano = 1.92;
+  const mTab = MineMaterials.plano(0xeeede6, { rough: 0.66, metal: 0.18 });
+
+  // Jamba ciega del lado del mamparo + PARTE FIJA del lado de la puerta exterior.
+  for (const [xa, xb] of [[xTabA, xVanoA], [xVanoB, xTabB]]) {
+    const pano = new THREE.Mesh(new THREE.BoxGeometry(xb - xa, hVano, 0.05), mTab);
+    pano.position.set((xa + xb) / 2, y0 + t + hVano / 2, zTab);
+    pano.castShadow = true;
+    S.add(pano);
+  }
+  // Dintel sobre el hueco, hasta el techo.
+  const dintelBano = new THREE.Mesh(
+    new THREE.BoxGeometry(xTabB - xTabA, H - t - hVano, 0.05), mTab
+  );
+  dintelBano.position.set((xTabA + xTabB) / 2, y0 + t + hVano + (H - t - hVano) / 2, zTab);
+  S.add(dintelBano);
+
+  // GUÍA superior de la corredera: perfil oscuro corrido sobre todo el tabique (foto: la banda
+  // que cruza por encima del hueco). Debajo cuelga la hoja.
+  const guiaCorr = new THREE.Mesh(
+    new THREE.BoxGeometry(xTabB - xTabA, 0.055, 0.075),
+    MineMaterials.plano(0x6a6a64, { rough: 0.5, metal: 0.55 })
+  );
+  guiaCorr.position.set((xTabA + xTabB) / 2, y0 + t + hVano - 0.028, zTab - 0.012);
+  S.add(guiaCorr);
+
+  // HOJA CORREDIZA, abierta y embutida en el tabique: solo asoma su canto de arrastre por el
+  // borde del vano, con el rebaje de tirador que se usa para cerrarla.
+  const cantoHoja = new THREE.Mesh(
+    new THREE.BoxGeometry(0.07, hVano - 0.10, 0.035),
+    MineMaterials.plano(0xe6e4db, { rough: 0.62, metal: 0.2 })
+  );
+  cantoHoja.position.set(xVanoB - 0.035, y0 + t + (hVano - 0.10) / 2, zTab - 0.030);
+  cantoHoja.castShadow = true;
+  S.add(cantoHoja);
+  const tirador = new THREE.Mesh(
+    new THREE.BoxGeometry(0.030, 0.13, 0.016),
+    MineMaterials.plano(0x8a8880, { rough: 0.45, metal: 0.6 })
+  );
+  tirador.position.set(xVanoB - 0.035, y0 + t + 1.02, zTab - 0.050);
+  S.add(tirador);
+
+  // ── PLACA DE IDENTIFICACIÓN Dräger | SIMSA sobre la PARTE FIJA del tabique ──
+  //  Es su sitio real: el paño que nunca se mueve, junto al hueco y a la altura de la vista.
+  const lienzoMRC = _texturaPlacaMRC();
+  const anchoMRC = 0.27;
+  const placaMRC = new THREE.Mesh(
+    new THREE.PlaneGeometry(anchoMRC, anchoMRC * (lienzoMRC.height / lienzoMRC.width)),
+    new THREE.MeshStandardMaterial({ map: _aTextura(lienzoMRC), roughness: 0.42, metalness: 0.35 })
+  );
+  placaMRC.position.set((xVanoB + xTabB) / 2, y0 + 1.62, zTab - 0.027);
+  placaMRC.rotation.y = Math.PI;
+  S.add(placaMRC);
+
+  // ── Cartel "INSTRUCCIONES PARA EL USO DEL BAÑO QUÍMICO" ─────────────
+  //  Va DENTRO del cuarto, en su pared del fondo: se lee desde el hueco y es lo que se ve al
+  //  asomarse (foto). Plastificado y con cuatro remaches en las esquinas.
   const lienzoBano = _texturaBanoQuimico();
-  const anchoBano = 0.44;
+  const anchoBano = 0.40;
   const altoBano = anchoBano * (lienzoBano.height / lienzoBano.width);
-  const zPre = A / 2 - t / 2 - 0.006;
+  const xBanoC = (xVanoA + xVanoB) / 2;          // centrado en el hueco: visible desde la esclusa
   const carBano = new THREE.Mesh(
     new THREE.PlaneGeometry(anchoBano, altoBano),
     new THREE.MeshStandardMaterial({ map: _aTextura(lienzoBano), roughness: 0.45, metalness: 0.05 })
   );
-  carBano.position.set((xBulk + L / 2) / 2 - 0.03, y0 + 1.36, zPre);
+  carBano.position.set(xBanoC, y0 + 1.30, zPre);
   carBano.rotation.y = Math.PI;
   S.add(carBano);
   for (const rx of [-1, 1]) for (const ry of [-1, 1]) {
@@ -2604,24 +2845,167 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     );
     remache.rotation.x = Math.PI / 2;
     remache.position.set(
-      (xBulk + L / 2) / 2 - 0.03 + rx * (anchoBano / 2 - 0.022),
-      y0 + 1.36 + ry * (altoBano / 2 - 0.022),
+      xBanoC + rx * (anchoBano / 2 - 0.022),
+      y0 + 1.30 + ry * (altoBano / 2 - 0.022),
       zPre - 0.004
     );
     S.add(remache);
   }
-  // ── El BAÑO QUÍMICO al que remite el cartel, en el suelo justo debajo ──
+  // ── El BAÑO QUÍMICO al que remite el cartel, dentro del cuarto ──
   const banoQ = _banoQuimico();
-  banoQ.position.set((xBulk + L / 2) / 2 - 0.03, y0 + t + 0.022, zPre - 0.24);
-  banoQ.rotation.y = Math.PI / 2;    // frente (asa, niveles y perilla) al pasillo
+  banoQ.position.set(xBanoC, y0 + t + 0.022, zPre - 0.26);
+  banoQ.rotation.y = Math.PI / 2;    // frente (asa, niveles y perilla) hacia el hueco
   S.add(banoQ);
   // rodapié de goma que lo mantiene en sitio
   const tacoBano = new THREE.Mesh(
     new THREE.BoxGeometry(0.46, 0.02, 0.06),
     MineMaterials.plano(0x2e2e2a, { rough: 0.9 })
   );
-  tacoBano.position.set((xBulk + L / 2) / 2 - 0.03, y0 + t + 0.032, zPre - 0.045);
+  tacoBano.position.set(xBanoC, y0 + t + 0.032, zPre - 0.055);
   S.add(tacoBano);
+  // FILM DE EMBALAJE: la unidad viene envuelta en plástico estirable de fábrica y no se retira
+  // hasta ponerla en servicio, así que un refugio con el baño precintado es un refugio que se
+  // inspecciona pero aún no se ha usado. Caja translúcida ligeramente holgada sobre el equipo.
+  const film = new THREE.Mesh(
+    new THREE.BoxGeometry(0.44, 0.455, 0.42),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xf2f4f2, transparent: true, opacity: 0.26,
+      roughness: 0.24, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.28,
+      side: THREE.DoubleSide, depthWrite: false
+    })
+  );
+  film.position.set(xBanoC, y0 + t + 0.022 + 0.2275, zPre - 0.26);
+  film.rotation.y = Math.PI / 2;
+  film.renderOrder = 3;
+  S.add(film);
+
+  // ════════════════════════════════════════════════════════════════
+  //  1b. INSTALACIÓN ELÉCTRICA VISTA DE LA PRECÁMARA
+  // ════════════════════════════════════════════════════════════════
+  //  Foto real: TUBERÍA RÍGIDA GALVANIZADA por pared y techo, sujeta con abrazaderas, unida con
+  //  coplas y rematada en CAJAS DE CONEXIÓN galvanizadas de las que sale CONDUIT FLEXIBLE negro
+  //  hacia cada aparato. En un refugio no hay cable a la vista: todo va en tubo metálico porque
+  //  la atmósfera puede tener gas. Es además lo que da textura al mamparo, que sin esto se lee
+  //  como una pared crema lisa.
+  //
+  //  Todo el tendido va en UNA geometría fusionada con material único: sin esto serían ~30
+  //  mallas sueltas dentro de un elemento que ya es el más pesado de la mina.
+  const mGalv = MineMaterials.plano(0x9fa2a0, { rough: 0.52, metal: 0.72 });
+  const xPre = (xBulk + L / 2) / 2;          // centro longitudinal de la esclusa
+  const zTub = zTab - 0.06;                  // corrido por delante del tabique del baño
+  const yTub = y0 + H - 0.16;                // corrido bajo el techo
+  const piezasTubo = [];
+
+  /** Tramo recto de tubo galvanizado entre dos puntos. */
+  const tramoTubo = (a, b, r = 0.017) => {
+    const dir = new THREE.Vector3().subVectors(b, a);
+    const geo = new THREE.CylinderGeometry(r, r, dir.length(), 8);
+    geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0), dir.clone().normalize()
+    ));
+    geo.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+    piezasTubo.push(geo);
+  };
+  /** Copla de unión (manguito más grueso) en un punto del tendido. */
+  const copla = (p) => {
+    const geo = new THREE.CylinderGeometry(0.023, 0.023, 0.07, 8);
+    geo.rotateZ(Math.PI / 2);
+    geo.translate(p.x, p.y, p.z);
+    piezasTubo.push(geo);
+  };
+  /** Abrazadera de sujeción al mamparo (estribo + tornillo). */
+  const abrazadera = (p) => {
+    const estribo = new THREE.TorusGeometry(0.024, 0.005, 4, 10, Math.PI);
+    estribo.rotateY(Math.PI / 2);
+    estribo.translate(p.x, p.y, p.z);
+    piezasTubo.push(estribo);
+    const pata = new THREE.BoxGeometry(0.05, 0.008, 0.012);
+    pata.translate(p.x, p.y + 0.026, p.z + 0.012);
+    piezasTubo.push(pata);
+  };
+
+  // Corrida principal a lo largo de la esclusa, con sus coplas y abrazaderas.
+  const xIniT = xBulk + 0.08, xFinT = L / 2 - 0.12;
+  tramoTubo(new THREE.Vector3(xIniT, yTub, zTub), new THREE.Vector3(xFinT, yTub, zTub));
+  copla(new THREE.Vector3(xPre + 0.18, yTub, zTub));
+  for (const xa of [xIniT + 0.22, xPre, xFinT - 0.24]) {
+    abrazadera(new THREE.Vector3(xa, yTub, zTub));
+  }
+  // Bajada al mamparo interior (alimenta las luminarias de la puerta).
+  tramoTubo(new THREE.Vector3(xIniT, yTub, zTub), new THREE.Vector3(xIniT, yTub, doorZ + 0.62));
+
+  if (piezasTubo.length) {
+    const fusionTubo = mergeGeometries(piezasTubo);
+    for (const p of piezasTubo) p.dispose();
+    const tuboGalv = new THREE.Mesh(fusionTubo, mGalv);
+    tuboGalv.castShadow = true;
+    S.add(tuboGalv);
+  }
+
+  // ── CAJA DE CONEXIÓN galvanizada + CONDUIT FLEXIBLE negro ─────────
+  const cajaConex = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.13, 0.075), mGalv);
+  cajaConex.position.set(xPre + 0.42, yTub - 0.13, zTub - 0.02);
+  cajaConex.castShadow = true;
+  S.add(cajaConex);
+  for (const [tx, ty] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const torn = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.006, 6), mCromo);
+    torn.rotation.x = Math.PI / 2;
+    torn.position.set(xPre + 0.42 + tx * 0.05, yTub - 0.13 + ty * 0.05, zTub - 0.060);
+    S.add(torn);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  1c. BALIZA DE ALARMA de la precámara (el domo negro de la foto)
+  // ════════════════════════════════════════════════════════════════
+  //  Domo oscuro sobre caja galvanizada, alimentado por conduit FLEXIBLE negro que baja del
+  //  techo. Es la fuente del destello ROJO que baña la esclusa: se dispara cuando el refugio
+  //  pasa a sus propias baterías, es decir, cuando ya no hay red de mina y la emergencia es real.
+  const balizaPre = new THREE.Group();
+  balizaPre.position.set(xPre + 0.30, y0 + H - 0.19, doorZ + 0.30);
+  S.add(balizaPre);
+  const cajaBaliza = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.11, 0.11), mGalv);
+  cajaBaliza.castShadow = true;
+  balizaPre.add(cajaBaliza);
+  // Domo emisivo: apagado es casi negro; en alarma se enciende en rojo y alimenta el bloom.
+  const domoBaliza = new THREE.Mesh(
+    new THREE.SphereGeometry(0.062, 14, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
+    new THREE.MeshStandardMaterial({
+      color: 0x14100f, emissive: 0xff1408, emissiveIntensity: 0, roughness: 0.28, metalness: 0.1
+    })
+  );
+  domoBaliza.position.set(0.02, -0.055, 0);
+  balizaPre.add(domoBaliza);
+  // Conduit flexible negro: baja del techo y entra a la caja por arriba (corrugado = anillos).
+  const mFlex = MineMaterials.plano(0x18181a, { rough: 0.82, metal: 0.1 });
+  const curvaFlex = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(xPre + 0.30, y0 + H - 0.13, doorZ + 0.30),
+    new THREE.Vector3(xPre + 0.34, y0 + H - 0.02, doorZ + 0.42),
+    new THREE.Vector3(xPre + 0.30, y0 + H + 0.04, doorZ + 0.66),
+    new THREE.Vector3(xPre + 0.10, y0 + H + 0.05, doorZ + 0.86)
+  ]);
+  const flexBaliza = new THREE.Mesh(new THREE.TubeGeometry(curvaFlex, 20, 0.016, 7, false), mFlex);
+  S.add(flexBaliza);
+
+  // ════════════════════════════════════════════════════════════════
+  //  1d. ROTULACIÓN DE LA PRECÁMARA
+  // ════════════════════════════════════════════════════════════════
+  //  Cartel "BAÑO" sobre el vano, placa del fabricante y flechas de circulación pintadas.
+  const lienzoBanoRot = _texturaLetrero('BAÑO');
+  const anchoBanoRot = 0.26;
+  const carBanoRot = new THREE.Mesh(
+    new THREE.PlaneGeometry(anchoBanoRot, anchoBanoRot * (lienzoBanoRot.height / lienzoBanoRot.width)),
+    new THREE.MeshStandardMaterial({ map: _aTextura(lienzoBanoRot), roughness: 0.6 })
+  );
+  // Va sobre el DINTEL del tabique, centrado en el hueco de paso (foto).
+  carBanoRot.position.set(xBanoC, y0 + t + hVano + 0.10, zTab - 0.027);
+  carBanoRot.rotation.y = Math.PI;
+  S.add(carBanoRot);
+
+  // (La placa Dräger | SIMSA va sobre la PARTE FIJA del tabique del baño — ver más arriba.)
+
+  // (Las flechas curvas de giro de manija y el "SALIDA / EXIT" van HORNEADOS en el decal de la
+  //  cara interior de la puerta exterior — ver `_texturaPuertaSalida` en la sección de la puerta.
+  //  Dibujarlos además como planos sueltos los duplicaba sobre la hoja equivocada.)
 
   // ════════════════════════════════════════════════════════════════
   //  INTERIOR — cámara principal
@@ -2647,6 +3031,9 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   const luzInt2 = new THREE.PointLight(0xf0f4ff, 6, 6, 2);
   luzInt2.position.set(-1.4, y0 + H, 0);
   S.add(luzInt2);
+  // Luz de la precámara. NO se le añade una luz roja aparte para la alarma: es ESTA misma la
+  // que vira a rojo en el `tick` (ver "ANIMACIÓN DE LUCES"). Una esclusa de 1 m no tendría dos
+  // luminarias, y además así el efecto no cuesta ni una luz dinámica más del presupuesto.
   const luzPre = new THREE.PointLight(0xf0f4ff, 3, 3.5, 2);
   luzPre.position.set((xBulk + L / 2) / 2, y0 + H - 0.1, 0);
   S.add(luzPre);
@@ -2678,6 +3065,25 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     );
     respaldo.position.set(cx, y0 + 0.84, sz * (A / 2 - t - 0.055));
     S.add(respaldo);
+    // FILM DE EMBALAJE sobre el asiento y el respaldo: igual que el baño químico, en la foto los
+    // acolchados siguen precintados de fábrica. Es el estado real de un refugio ya instalado e
+    // inspeccionado pero todavía sin poner en servicio.
+    for (const [fw, fh, fd, fy, fz] of [
+      [largo - 0.04, 0.10, 0.44, y0 + t + 0.45, sz * (A / 2 - 0.24)],
+      [largo - 0.04, 0.33, 0.10, y0 + 0.84, sz * (A / 2 - t - 0.055)]
+    ]) {
+      const filmB = new THREE.Mesh(
+        new THREE.BoxGeometry(fw, fh, fd),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xf2f4f2, transparent: true, opacity: 0.24,
+          roughness: 0.22, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.3,
+          side: THREE.DoubleSide, depthWrite: false
+        })
+      );
+      filmB.position.set(cx, fy, fz);
+      filmB.renderOrder = 3;
+      S.add(filmB);
+    }
   }
 
   // ── Piso interior de triplay (madera clara, fotos reales) ─────────
@@ -2718,17 +3124,23 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   const bpu = new THREE.Group();
   bpu.position.set(-L / 2 + 0.55, y0 + t, 0); // contra el fondo (las baterías van en la recámara exterior)
   S.add(bpu);
-  const gabAlto = 1.55, gabW = 0.62, gabD = 0.7;
+  // COTAS tomadas de la foto real usando los cilindros de O2 como escala (Ø 0.23 m normalizado):
+  // cuerpo azul 1.23 m + tolvas 0.22 m = 1.45 m de alto total, 0.67 m de ancho. Antes el
+  // gabinete medía 1.85 m con las torretas y casi tocaba la bóveda; en la foto le sobra casi
+  // un metro por encima, que es justo donde va montado el split.
+  const gabAlto = 1.23, gabW = 0.67, gabD = 0.60;
   const gabinete = new THREE.Mesh(new THREE.BoxGeometry(gabD, gabAlto, gabW), mBPU);
   gabinete.position.set(0, gabAlto / 2, 0);
   gabinete.castShadow = true;
+  gabinete.name = 'bpu_gabinete';
   bpu.add(gabinete);
-  // rejilla de ventilación frontal NEGRA perforada (foto real)
+  // Rejilla de ventilación frontal: en la foto es ANCHA Y BAJA (casi todo el ancho del frente),
+  // no alta y estrecha. Por ella respira el ventilador que mueve el aire por los absorbentes.
   const grid = new THREE.Mesh(
-    new THREE.BoxGeometry(0.02, 0.52, 0.46),
+    new THREE.BoxGeometry(0.02, 0.32, 0.59),
     MineMaterials.plano(0x14181c, { rough: 0.75, metal: 0.3 })
   );
-  grid.position.set(gabD / 2 + 0.001, 0.82, 0);
+  grid.position.set(gabD / 2 + 0.001, 0.62, 0);
   bpu.add(grid);
   // manguera negra enrollada colgada al costado frontal-izquierdo (foto)
   for (let i = 0; i < 3; i++) {
@@ -2740,60 +3152,112 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     rollo.position.set(gabD / 2 + 0.03 + i * 0.018, 0.72, -gabW / 2 + 0.1);
     bpu.add(rollo);
   }
-  // panel de control INCLINADO (render Dräger): cara blanca con indicadores,
-  // diagrama de flujo y dial + paro de emergencia y botón verde 3D
-  const panelGrupo = new THREE.Group();
-  panelGrupo.position.set(gabD / 2 - 0.07, gabAlto - 0.13, 0);
-  panelGrupo.rotation.z = -0.38; // inclinado hacia el operador
-  bpu.add(panelGrupo);
-  const panelCtrl = new THREE.Mesh(
-    new THREE.BoxGeometry(0.05, 0.3, 0.56),
+  // ── FRANJA DE MANDOS, a ras del frente ──────────────────────────────
+  //  En la foto NO hay pupitre inclinado: es una franja horizontal de ~10 cm empotrada en lo
+  //  alto del frente azul. De izquierda a derecha (mirando la máquina): dos interruptores
+  //  plateados, el visor, el pulsador ROJO de paro y el VERDE de marcha. Con el operador de pie
+  //  a 1.1 m, una franja plana se lee igual y no rompe la caja como un pupitre.
+  const yPanel = gabAlto - 0.15;
+  const franja = new THREE.Mesh(
+    new THREE.BoxGeometry(0.035, 0.115, 0.60),
     MineMaterials.plano(0x0f4a90, { rough: 0.5, metal: 0.3 })
   );
-  panelGrupo.add(panelCtrl);
+  franja.position.set(gabD / 2 - 0.005, yPanel, 0);
+  bpu.add(franja);
   const caraPanel = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.52, 0.26),
+    new THREE.PlaneGeometry(0.58, 0.105),
     new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPanelBPU()), roughness: 0.5 })
   );
   caraPanel.rotation.y = Math.PI / 2;
-  caraPanel.position.set(0.026, 0, 0);
-  panelGrupo.add(caraPanel);
+  caraPanel.position.set(gabD / 2 + 0.014, yPanel, 0);
+  bpu.add(caraPanel);
+  // El observador mira la BPU desde +X, así que SU izquierda es +Z: los interruptores quedan
+  // en +Z y los pulsadores en -Z, en el mismo orden que la foto.
+  const mInterr = MineMaterials.plano(0xc9c9c2, { rough: 0.35, metal: 0.7 });
+  for (const iz of [0.225, 0.160]) {
+    const palanca = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.055, 0.022), mInterr);
+    palanca.position.set(gabD / 2 + 0.020, yPanel, iz);
+    bpu.add(palanca);
+  }
+  const visor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.012, 0.072, 0.145),
+    MineMaterials.plano(0xf0f2f0, { rough: 0.25, metal: 0.15 })
+  );
+  visor.position.set(gabD / 2 + 0.018, yPanel, 0.02);
+  bpu.add(visor);
   const paro = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.045, 0.045, 0.03, 14),
+    new THREE.CylinderGeometry(0.028, 0.028, 0.022, 14),
     MineMaterials.plano(0xd01111, { rough: 0.4, emissive: 0x400000, emissiveIntensity: 0.4 })
   );
   paro.rotation.z = Math.PI / 2;
-  paro.position.set(0.04, -0.09, -0.21);
-  panelGrupo.add(paro);
+  paro.position.set(gabD / 2 + 0.022, yPanel, -0.135);
+  bpu.add(paro);
   const btnVerde = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.028, 0.028, 0.025, 12),
+    new THREE.CylinderGeometry(0.026, 0.026, 0.022, 12),
     MineMaterials.plano(0x18b038, { rough: 0.4, emissive: 0x0a4015, emissiveIntensity: 0.6 })
   );
   btnVerde.rotation.z = Math.PI / 2;
-  btnVerde.position.set(0.038, -0.09, 0.21);
-  panelGrupo.add(btnVerde);
-  // dos TORRETAS superiores con letreros blancos (foto real: control de
-  // oxígeno y esclusa de agua sobre el gabinete)
-  for (const [tz, txt] of [[-0.17, 'CONTROL DE OXÍGENO'], [0.17, 'ESCLUSA DE AGUA']]) {
-    const torre = new THREE.Mesh(new THREE.BoxGeometry(gabD * 0.8, 0.3, 0.26), mBPU);
-    torre.position.set(-0.03, gabAlto + 0.15, tz);
-    torre.castShadow = true;
-    bpu.add(torre);
-    const letrero = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.22, 0.13),
-      new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPlaca(txt, '#444')), roughness: 0.7 })
+  btnVerde.position.set(gabD / 2 + 0.022, yPanel, -0.220);
+  bpu.add(btnVerde);
+
+  // ── TOLVAS DE CONSUMIBLE sobre el gabinete ──────────────────────────
+  //  Son las dos bocas por las que se carga el material que trata el aire: a un lado el
+  //  ABSORBENTE DE CO2 (cal sodada) y al otro el ABSORBENTE DE HUMEDAD con el CATALIZADOR DE CO.
+  //  Van rotuladas en naranja porque confundirlas durante el encierro dejaría la atmósfera sin
+  //  tratar. Cada una lleva su TAPA DE CARGA naranja arriba.
+  //  Son DEPÓSITOS HUECOS y van SIN TAPA: el cuerpo se arma con cuatro paredes de chapa y un
+  //  fondo, sin cara superior, de modo que al asomarse se ve el cajón vacío por dentro.
+  const TOLVA_W = 0.315, TOLVA_H = 0.22, TOLVA_D = 0.38;
+  const TOLVA_E = 0.014;            // espesor de la chapa del depósito
+  // Las paredes se ven por sus DOS caras (fuera y dentro del cajón abierto), así que llevan
+  // material propio: no se puede tocar `.side` de los materiales cacheados de MineMaterials.
+  const mChapaTolva = new THREE.MeshStandardMaterial({
+    color: 0x1559ad, roughness: 0.45, metalness: 0.35, side: THREE.DoubleSide
+  });
+  const mFondoTolva = MineMaterials.plano(0x102a44, { rough: 0.9, metal: 0.1 });
+
+  for (const [tz, lineas] of [
+    [ TOLVA_W / 2 + 0.002, ['ABSORBENTE DE CO2']],
+    [-TOLVA_W / 2 - 0.002, ['ABSORBENTE HUMEDAD', 'CATALIZADOR CO']]
+  ]) {
+    const yBase = gabAlto;
+    // cuatro paredes, sin cara superior
+    for (const [dx, dz, sx, sz] of [
+      [ TOLVA_D / 2 - TOLVA_E / 2, 0, TOLVA_E, TOLVA_W],
+      [-TOLVA_D / 2 + TOLVA_E / 2, 0, TOLVA_E, TOLVA_W],
+      [0,  TOLVA_W / 2 - TOLVA_E / 2, TOLVA_D - 2 * TOLVA_E, TOLVA_E],
+      [0, -TOLVA_W / 2 + TOLVA_E / 2, TOLVA_D - 2 * TOLVA_E, TOLVA_E]
+    ]) {
+      const pared = new THREE.Mesh(new THREE.BoxGeometry(sx, TOLVA_H, sz), mChapaTolva);
+      pared.position.set(-0.02 + dx, yBase + TOLVA_H / 2, tz + dz);
+      pared.castShadow = true;
+      pared.name = 'bpu_tolva';
+      bpu.add(pared);
+    }
+    // fondo del cajón, en sombra
+    const fondoTolva = new THREE.Mesh(
+      new THREE.BoxGeometry(TOLVA_D - 2 * TOLVA_E, 0.012, TOLVA_W - 2 * TOLVA_E),
+      mFondoTolva
     );
-    letrero.rotation.y = Math.PI / 2;
-    letrero.position.set(-0.03 + gabD * 0.4 + 0.002, gabAlto + 0.15, tz);
-    bpu.add(letrero);
+    fondoTolva.position.set(-0.02, yBase + 0.006, tz);
+    bpu.add(fondoTolva);
+
+    const rotuloTolva = new THREE.Mesh(
+      new THREE.PlaneGeometry(TOLVA_W - 0.03, (TOLVA_W - 0.03) * 96 / 340),
+      new THREE.MeshStandardMaterial({ map: _aTextura(_texturaTolva(lineas)), roughness: 0.6 })
+    );
+    rotuloTolva.rotation.y = Math.PI / 2;
+    rotuloTolva.position.set(-0.02 + TOLVA_D / 2 + 0.002, gabAlto + TOLVA_H / 2 + 0.015, tz);
+    bpu.add(rotuloTolva);
   }
-  // etiqueta amarilla de advertencia (render: frontal inferior)
+
+  // etiqueta amarilla de advertencia (foto: esquina inferior izquierda del frente)
   const etiqueta = new THREE.Mesh(
     new THREE.PlaneGeometry(0.14, 0.07),
     MineMaterials.plano(0xf5c300, { rough: 0.6 })
   );
   etiqueta.rotation.y = Math.PI / 2;
-  etiqueta.position.set(gabD / 2 + 0.002, 0.2, -0.18);
+  etiqueta.position.set(gabD / 2 + 0.002, 0.20, 0.20);
   bpu.add(etiqueta);
   // logo Dräger | SIMSA — Breathing Protection Unit
   const bpuLogo = new THREE.Mesh(
@@ -2801,7 +3265,7 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     new THREE.MeshStandardMaterial({ map: _aTextura(_texturaBPU()), transparent: true, roughness: 0.5 })
   );
   bpuLogo.rotation.y = Math.PI / 2;
-  bpuLogo.position.set(gabD / 2 + 0.022, 0.46, 0);
+  bpuLogo.position.set(gabD / 2 + 0.022, 0.31, 0);
   bpu.add(bpuLogo);
 
   // ── GRUPO de cilindros de O2 BLANCOS (2×2) junto a la BPU, con
@@ -2813,15 +3277,15 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   const o2Blancos = new THREE.Group();
   o2Blancos.position.set(-1.98, y0 + t, -A / 2 + 0.41);
   S.add(o2Blancos);
+  // DOS cilindros en línea, no cuatro en 2×2: es lo que hay en la foto, y es lo coherente con
+  // el hueco disponible entre la BPU y el costado. Ø 0.23 m × 1.6 m (botella industrial de 50 L).
   const O2_ALTO = 1.6, O2_RADIO = 0.115;
-  const posO2 = [];
-  for (let i = 0; i < 4; i++) {
-    const px = 0.13 - (i % 2) * 0.26, pz = -0.13 + Math.floor(i / 2) * 0.26;
-    posO2.push([px, pz]);
+  const posO2 = [[0, -0.125], [0, 0.125]];
+  posO2.forEach(([px, pz], i) => {
     const cil = _cilindroO2(O2_ALTO, O2_RADIO, { seed: i + 1 });
     cil.position.set(px, 0, pz);
     o2Blancos.add(cil);
-  }
+  });
   // ── Cabezal completo por cilindro, mirando al pasillo (+X) ──
   const yCabezal = O2_ALTO + O2_RADIO * 0.78 + 0.03;
   for (const [px, pz] of posO2) {
@@ -2829,25 +3293,41 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     cab.position.set(px, yCabezal, pz);
     o2Blancos.add(cab);
   }
-  // ── Correa de sujeción con hebilla (D.S. 024: cilindros asegurados) ──
+  // ── ESLINGA NARANJA DE CARRACA (D.S. 024: cilindros asegurados) ──────
+  //  Una botella de O2 a 200 bar suelta es un proyectil: la eslinga con carraca es obligatoria y
+  //  en la foto es de lo más visible de la escena. Abraza las DOS botellas y tensa contra un
+  //  cáncamo del mamparo; la carraca queda al frente, donde se aprieta.
   const mCorrea = MineMaterials.plano(0xd86a10, { rough: 0.78, metal: 0.05 });
-  const semiX = 0.13 + O2_RADIO, semiZ = 0.13 + O2_RADIO;  // tangente al grupo
-  for (const cz of [-semiZ, semiZ]) {
-    const tramo = new THREE.Mesh(new THREE.BoxGeometry(2 * semiX, 0.05, 0.012), mCorrea);
-    tramo.position.set(0, 1.02, cz);
+  const semiX = O2_RADIO, semiZ = 0.125 + O2_RADIO;   // tangente al par de botellas
+  const yCorrea = 1.02;
+  for (const cx of [-semiX, semiX]) {                 // los dos ramales, delante y detrás
+    const tramo = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.055, 2 * semiZ), mCorrea);
+    tramo.position.set(cx, yCorrea, 0);
     o2Blancos.add(tramo);
   }
-  for (const cx of [-semiX, semiX]) {
-    const tramo = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.05, 2 * semiZ), mCorrea);
-    tramo.position.set(cx, 1.02, 0);
+  for (const cz of [-semiZ, semiZ]) {                 // cierre en los extremos
+    const tramo = new THREE.Mesh(new THREE.BoxGeometry(2 * semiX, 0.055, 0.012), mCorrea);
+    tramo.position.set(0, yCorrea, cz);
     o2Blancos.add(tramo);
   }
-  const hebilla = new THREE.Mesh(
-    new THREE.BoxGeometry(0.05, 0.062, 0.02),
-    MineMaterials.plano(0x8a8880, { rough: 0.4, metal: 0.7 })
-  );
-  hebilla.position.set(0.07, 1.02, semiZ + 0.004);
-  o2Blancos.add(hebilla);
+  // Carraca al frente (+X = lado del pasillo): cuerpo metálico + palanca.
+  const mHerraje = MineMaterials.plano(0x8a8880, { rough: 0.4, metal: 0.7 });
+  const carraca = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.085, 0.055), mHerraje);
+  carraca.position.set(semiX + 0.035, yCorrea, 0.06);
+  o2Blancos.add(carraca);
+  const palancaCar = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.016, 0.032), mHerraje);
+  palancaCar.position.set(semiX + 0.085, yCorrea - 0.045, 0.06);
+  palancaCar.rotation.z = -0.35;
+  o2Blancos.add(palancaCar);
+  // Cáncamo de anclaje al mamparo + tramo de eslinga que va a él.
+  const cancamoO2 = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.008, 6, 12), mHerraje);
+  cancamoO2.rotation.y = Math.PI / 2;
+  cancamoO2.position.set(-semiX - 0.10, yCorrea - 0.12, -semiZ - 0.02);
+  o2Blancos.add(cancamoO2);
+  const tiro = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.05, 0.012), mCorrea);
+  tiro.position.set(-semiX - 0.05, yCorrea - 0.06, -semiZ - 0.01);
+  tiro.rotation.z = 0.55;
+  o2Blancos.add(tiro);
 
   // ── Manifold de pared: dos tubos horizontales con abrazaderas y las
   //    latiguillos de cada cabezal subiendo hasta ellos (foto real) ──
@@ -3373,6 +3853,18 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   );
   acRej.position.set(-L / 2 + t + 0.30, y0 + H - 0.43, -0.2);
   S.add(acRej);
+  // Split también PRECINTADO en film (foto), como las bancas y el baño químico.
+  const filmAC = new THREE.Mesh(
+    new THREE.BoxGeometry(0.27, 0.33, 0.98),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xf2f4f2, transparent: true, opacity: 0.22,
+      roughness: 0.22, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.3,
+      side: THREE.DoubleSide, depthWrite: false
+    })
+  );
+  filmAC.position.set(-L / 2 + t + 0.185, y0 + H - 0.32, -0.2);
+  filmAC.renderOrder = 3;
+  S.add(filmAC);
 
   // ── ESTACIÓN DE MONITOREO DE GASES (foto real de la pared del fondo) ──
   //  Tres DRÄGER POLYTRON 5000 encadenados por uniones de conduit inoxidable:
@@ -3745,7 +4237,15 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   //  2. ROJA  fija  = refugio usando sus PROPIAS BATERÍAS.
   //     Alternan cada 60 s y son EXCLUYENTES (nunca ambas a la vez).
   //  3. ÁMBAR: SIEMPRE parpadeando (1 Hz), independiente de las demás.
+  //  4. PRECÁMARA: mientras el refugio está en BATERÍAS, la esclusa entra en ALARMA y su luz
+  //     vira de blanco a ROJO saturado (foto real). Se ata al MISMO estado que el semáforo
+  //     exterior a propósito: la roja de fuera y la roja de dentro cuentan lo mismo —se cayó la
+  //     red de mina—, así que no pueden contradecirse. El destello es lento y con rampa suave,
+  //     no un estrobo duro: en la foto el rojo se sostiene y baña el compartimento entero.
+  //     Reutiliza la luz que YA existía en la esclusa; no añade ninguna luz dinámica.
   let tLuces = 0;
+  const colBlancoPre = new THREE.Color(0xf0f4ff);
+  const colRojoPre   = new THREE.Color(0xff1a06);
   g.userData.tick = (dt) => {
     tLuces += dt;
     const enRed = (tLuces % 120) < 60; // 1 min red de mina ↔ 1 min baterías
@@ -3758,6 +4258,17 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     const blink = (tLuces % 1.0) < 0.5;
     lamparas.ambar.material.emissiveIntensity = blink ? 3.2 : 0.12;
     lamparas.ambar.material.color.set(blink ? 0xe08a00 : 0x2a2418);
+
+    // ALARMA DE LA PRECÁMARA. `pulso` 0..1 con seno (rampa suave, ~0.55 Hz) y suelo alto: en
+    // alarma nunca baja del 55%, de modo que el rojo se sostiene y solo "respira".
+    const alarma = !enRed;
+    const pulso = alarma ? 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(tLuces * 3.4)) : 0;
+    luzPre.color.copy(alarma ? colRojoPre : colBlancoPre);
+    luzPre.intensity = alarma ? 1.2 + 5.4 * pulso : 3;
+    // El LED de servicio se apaga en alarma: si siguiera blanco, lavaría el rojo de la escena.
+    ledPre.material.emissiveIntensity = alarma ? 0.05 : 2.2;
+    // El domo de la baliza es el emisor visible del destello (alimenta el bloom).
+    domoBaliza.material.emissiveIntensity = alarma ? 0.6 + 5.5 * pulso : 0;
   };
   g.userData.tick(0); // estado inicial coherente (verde encendida)
 

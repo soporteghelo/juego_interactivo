@@ -119,16 +119,20 @@ export function crear() {
 
   // ── NEUMATICOS (4) ─────────────────────────────────────────────────
   S = sub(g, 'neumaticos', 'Neumaticos', '4 neumaticos con banda minera, rines y guardabarros.');
+  const ruedas = [];
   for (const [px, pz] of [[-HW, 1.05], [HW, 1.05], [-HW, -1.80], [HW, -1.80]]) {
     const side = px < 0 ? -1 : 1, xo = px + side * 0.16;
-    put(S, cy(0.55, 0.55, 0.34, 18, M.gom), xo, GY, pz, 0, 0, Math.PI / 2);
+    // RUEDA como GRUPO que gira COMPLETO (neumatico + tacos + rin) alrededor de su eje X.
+    const w = new THREE.Group(); w.position.set(xo, GY, pz);
+    put(w, cy(0.55, 0.55, 0.34, 18, M.gom), 0, 0, 0, 0, 0, Math.PI / 2);
     for (let i = 0; i < 20; i++) {
       const a = (i / 20) * Math.PI * 2, taco = bx(0.36, 0.05, 0.12, M.k);
-      taco.position.set(xo, GY + Math.sin(a) * 0.555, pz + Math.cos(a) * 0.555);
-      taco.rotation.x = a; S.add(taco);
+      taco.position.set(0, Math.sin(a) * 0.555, Math.cos(a) * 0.555);
+      taco.rotation.x = a; w.add(taco);
     }
-    put(S, cy(0.27, 0.27, 0.36, 12, M.rin), xo, GY, pz, 0, 0, Math.PI / 2);
-    put(S, fender(0.68, 0.44, 2.5, M.azD), xo, GY, pz, 0, 0, Math.PI / 2);
+    put(w, cy(0.27, 0.27, 0.36, 12, M.rin), 0, 0, 0, 0, 0, Math.PI / 2);
+    S.add(w); ruedas.push(w);
+    put(S, fender(0.68, 0.44, 2.5, M.azD), xo, GY, pz, 0, 0, Math.PI / 2); // guardabarros (estatico)
   }
 
   // ── GATAS ESTABILIZADORAS (4) ──────────────────────────────────────
@@ -190,12 +194,15 @@ export function crear() {
   S.add(crearExtintor({ x: HW + 0.10, y: 0.92, z: -1.20, ry: Math.PI / 2 }));
 
   g.name = 'desatador';
+  g.userData._speed = 0;   // lo inyecta VehicleSystem/DriveController al circular
   g.userData.tick = (dt, elapsed) => {
     balM.emissiveIntensity = 1.5 + Math.abs(Math.sin(elapsed * 4)) * 2.5;
     // Barrido del brazo por el techo/hastial + percusion de la pica
     B.rotation.y = Math.sin(elapsed * 0.5) * 0.30;
     B.rotation.x = -angV + Math.sin(elapsed * 0.4) * 0.10;
     pica.position.z = 0.35 + Math.max(0, Math.sin(elapsed * 30)) * 0.06;  // golpeteo del martillo
+    const vel = g.userData._speed;  // ruedas RUEDAN al circular (rueda vertical, eje X; radio 0.55)
+    if (vel) for (const r of ruedas) r.rotation.x += (vel / 0.55) * dt;
   };
   g.userData.hazard = {
     tipo: 'equipoPesado', live: true, warn: 6, hurt: 0.6,

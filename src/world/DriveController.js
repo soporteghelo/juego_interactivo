@@ -26,7 +26,7 @@ import * as THREE from 'three';
  * 'player:moved' con la posicion del vehiculo para que el streaming de tramos lo siga.
  */
 
-const ACCEL = 3.5;  // suavizado de aceleracion
+const ACCEL = 1.6;  // aceleracion progresiva; evita alcanzar la maxima casi al instante
 const BOOM_RATE   = 0.7;  // fraccion de recorrido por segundo (hidraulica)
 const BUCKET_RATE = 0.9;
 
@@ -58,8 +58,13 @@ export class DriveController {
 
     this._onKeyDown = (e) => this._keydown(e);
     this._onKeyUp = (e) => this._keys.delete(e.code);
+    this._onBlur = () => {
+      this._keys.clear();
+      if (this.active) this.speed = 0;
+    };
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup', this._onKeyUp);
+    window.addEventListener('blur', this._onBlur);
 
     // Bocina desde el boton tactil (TouchControls emite 'drive:horn').
     this.bus?.on('drive:horn', () => {
@@ -199,7 +204,8 @@ export class DriveController {
     // A la ALTURA del piso real (importante si se desmonta en la rampa o el nivel inferior).
     const gy = this.world?.groundHeight?.(spot);
     if (gy !== null && gy !== undefined) spot.y = gy + 1.4;
-    this.player.controller.teleport(spot);
+    this.player.teleport?.(spot);
+    if (!this.player.teleport) this.player.controller.teleport(spot);
     this.player.mesh.visible = this._avatarWasVisible;
 
     reg.onExit?.(reg.mesh);
@@ -375,5 +381,6 @@ export class DriveController {
   dispose() {
     window.removeEventListener('keydown', this._onKeyDown);
     window.removeEventListener('keyup', this._onKeyUp);
+    window.removeEventListener('blur', this._onBlur);
   }
 }

@@ -151,7 +151,11 @@ function neutralizarRootMotion(clip) {
 // --- Construcción de EPP (centrados en el origen del hueso, en METROS) ---
 
 function matPlano(color, rough = 0.8, extra = {}) {
-  return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0, ...extra });
+  // `metal` es el alias corto de metalness que usan los llamadores. Se traduce aqui: antes se
+  // colaba por el spread como propiedad `metal` inexistente en MeshStandardMaterial → Three.js
+  // avisaba y, peor, la metalicidad pretendida (cromo 0.95, acero inox 0.9…) quedaba en 0 = mate.
+  const { metal, ...rest } = extra;
+  return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal ?? 0, ...rest });
 }
 
 /** Clave visual de un material (para agrupar mallas fusionables que se ven igual). */

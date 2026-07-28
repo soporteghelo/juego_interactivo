@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { createTunnelShell } from './TunnelGeometry.js';
+import { createTunnelShell, createWireframeLaborShell } from './TunnelGeometry.js';
 import { MineMaterials } from '../materials/MineMaterials.js';
 import { Settings } from '../../core/Settings.js';
 
@@ -19,7 +19,7 @@ import { Settings } from '../../core/Settings.js';
  * (LED verde, anchura, refugio, etc.). PropScatter agrega pernos/malla/senales/charcos.
  */
 export class BaseSegment {
-  constructor({ width, height, length, rng, shotcrete = true, detail = 1 }) {
+  constructor({ width, height, length, rng, shotcrete = true, detail = 1, wireframeStyle = false, variant = null }) {
     this.width = width;
     this.height = height;
     this.length = length;
@@ -28,6 +28,18 @@ export class BaseSegment {
     // `detail` (0..1) escala la densidad de malla de la carcasa y el piso. 1 = calidad plena
     // (modo lineal, sin cambios). El modo retICula usa <1 para aligerar decenas de tramos.
     this.detail = detail;
+    this.wireframeStyle = wireframeStyle;
+
+    // ── VARIANTE DE CAJA (por semilla, ver GridLayoutGenerator._sectionVariant) ──
+    // Es lo que hace que dos labores contiguas NO se vean iguales: litologia, forma de la
+    // herradura, corona mas o menos desquinchada, cuneta labrada a uno o a los dos lados y
+    // cuanta roca suelta quedo sin limpiar. Con valores por defecto = comportamiento historico.
+    this.variant    = variant || {};
+    this.rockType   = this.variant.rockType   ?? 'caliza';
+    this.archRatio  = this.variant.archRatio  ?? 0.40;
+    this.crownRough = this.variant.crownRough ?? 0.5;
+    this.cuneta     = this.variant.cuneta     ?? 'ambas';
+    this.debrisFactor = this.variant.debris   ?? 1;
 
     this.group = new THREE.Group();
     this.colliders = [];
@@ -53,33 +65,86 @@ export class BaseSegment {
 
   _buildShell() {
     const rng = () => this.rng.next();
-    const geo = createTunnelShell({
-      width:     this.width,
-      height:    this.height,
-      length:    this.length,
-      // densidad moderada, suficiente para fBM; escalada por `detail` (1 = valor historico).
-      segmentsZ: Math.max(Math.round(12 * this.detail), Math.round(this.length * this.detail)),
-      jitter:    0.48,  // jitter fBm amplio: roca excavada con ondulaciones marcadas (aspecto minero)
-      rng
-    });
+    // CARACTER UNICO por labor: cada tramo saca su propia rugosidad y ensanche de la semilla, de
+    // modo que NINGUNA galeria/crucero se ve igual a otra (antes: jitter fijo 0.48 = "copias").
+    // El jitter es 0 en las bocas (r=0/rows-1), asi que variarlo no rompe la union con el cruce.
+    const jitter     = 0.28 + this.rng.next() * 0.36;   // 0.28-0.64: de casi lisa a muy sobre-excavada
+    const breatheAmp = 0.07 + this.rng.next() * 0.14;   // 0.07-0.21: seccion mas o menos ondulante
+    const geo = this.wireframeStyle
+      ? createWireframeLaborShell({
+          width: this.width,
+          height: this.height,
+          length: this.length,
+          // Pocos anillos deliberados: caras grandes y quebradas como el wireframe de referencia.
+          segmentsZ: Math.max(6, Math.round(this.length * this.detail * 0.75)),
+          jitter: Math.max(0.34, jitter * 0.9),
+          rockType: this.rockType,
+          rng
+        })
+      : createTunnelShell({
+          width:     this.width,
+          height:    this.height,
+          length:    this.length,
+          // densidad moderada, suficiente para fBM; escalada por `detail` (1 = valor historico).
+          segmentsZ: Math.max(Math.round(12 * this.detail), Math.round(this.length * this.detail)),
+          jitter, breatheAmp,
+          archRatio:  this.archRatio,
+          rockType:   this.rockType,
+          crownRough: this.crownRough,
+          rng
+        });
     // Base siempre en roca oscura; los parches de shotcrete van por encima.
-    const shell = new THREE.Mesh(geo, MineMaterials.rocaTunel());
+    const shellMaterial = this.wireframeStyle ? MineMaterials.rocaTunel().clone() : MineMaterials.rocaTunel();
+    if (this.wireframeStyle) {
+      shellMaterial.flatShading = true;
+      shellMaterial.needsUpdate = true;
+    }
+    const shell = new THREE.Mesh(geo, shellMaterial);
     shell.receiveShadow = true;
     shell.name = 'shell';
+    shell.userData.wireframeLabor = this.wireframeStyle;
     this.group.add(shell);
     this.shell = shell;
+
+    // En estas labores las aristas actúan como juntas/sombras de la roca levantada. Hacen
+    // legible la forma triangulada incluso con poca luz, sin convertir la mina en un visor azul.
+    if (this.wireframeStyle) {
+      const joints = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo, 7),
+        new THREE.LineBasicMaterial({
+          color: 0x365164,
+          transparent: true,
+          opacity: 0.32,
+          depthWrite: false
+        })
+      );
+      joints.name = 'wireframe_roca_juntas';
+      joints.renderOrder = 2;
+      joints.userData.wireframeLabor = true;
+      this.group.add(joints);
+    }
 
     if (this.shotcrete) this._buildShotcretePatches();
   }
 
-  /** Parches irregulares de hormigon proyectado (shotcrete) sobre la roca oscura. */
+  /**
+   * Parches irregulares de hormigon proyectado (shotcrete) sobre la roca oscura.
+   *
+   * Los 5-11 parches del tramo se FUSIONAN en una sola malla: comparten material y no se mueven,
+   * asi que como mallas sueltas solo aportaban una geometria y una llamada de dibujo cada una
+   * (con ~250 tramos eran miles de geometrias). El aspecto es identico.
+   */
   _buildShotcretePatches() {
     const mat     = MineMaterials.shotcrete(true);
     const halfW   = this.width / 2;
-    const wallTop = this.height * 0.6;
+    // Sigue la MISMA herradura que la carcasa (archRatio variable por labor): con un valor fijo
+    // los parches quedaban despegados de la roca en las labores de arco alto o bajo.
+    const wallTop = this.height * (1 - this.archRatio);
     const archH   = this.height - wallTop;
     const n = this.rng.int(5, 11);
 
+    const molde = new THREE.Object3D();   // solo para calcular el transform de cada parche
+    const geos = [];
     for (let i = 0; i < n; i++) {
       const z  = -this.rng.range(0.4, this.length - 0.4);
       const t  = this.rng.range(0.08, 0.92) * Math.PI; // angulo del arco
@@ -87,15 +152,22 @@ export class BaseSegment {
       const cy = wallTop + archH * Math.sin(t);
 
       const r   = this.rng.range(0.35, 1.5);
+      molde.position.set(cx, cy, z);
+      molde.scale.set(this.rng.range(0.5, 2.2), this.rng.range(0.4, 1.6), 1);
+      molde.rotation.set(0, 0, 0);
+      molde.lookAt(new THREE.Vector3(0, wallTop * 0.5, z));
+      molde.translateZ(0.06); // ligeramente hacia el interior para evitar z-fighting
+      molde.updateMatrix();
+
       const geo = new THREE.CircleGeometry(r, 7);
-      const patch = new THREE.Mesh(geo, mat);
-      patch.position.set(cx, cy, z);
-      patch.scale.set(this.rng.range(0.5, 2.2), this.rng.range(0.4, 1.6), 1);
-      patch.lookAt(new THREE.Vector3(0, wallTop * 0.5, z));
-      patch.translateZ(0.06); // ligeramente hacia el interior para evitar z-fighting
-      patch.name = 'shotcrete_patch';
-      this.group.add(patch);
+      geo.applyMatrix4(molde.matrix);
+      geos.push(geo);
     }
+    if (!geos.length) return;
+    const parches = new THREE.Mesh(mergeGeometries(geos), mat);
+    for (const g of geos) g.dispose();
+    parches.name = 'shotcrete_parches';
+    this.group.add(parches);
   }
 
   _buildFloor() {
@@ -114,8 +186,12 @@ export class BaseSegment {
 
     // Surcos de neumatico (dos carriles donde pasan los equipos).
     const rut = this.width * 0.2;
-    // Cunetas ANCHAS: zanja de drenaje pronunciada pegada a cada hastial (obstaculo de piso).
-    const cunetaX = this.width / 2 - 0.6;
+    // CUNETA: cada labor la tiene labrada distinto (a ambos lados, a uno solo o sin cuneta —
+    // drenaje por el propio piso). `_cunetaSides` lo consulta tambien el agua y los bordillos.
+    const sides = this._cunetaSides();
+    // Zanja de drenaje pegada al hastial; su separacion y profundidad tambien varian por labor.
+    const cunetaX = this.width / 2 - rng.range(0.5, 0.8);
+    const cunetaProf = rng.range(0.13, 0.22);
     const pos = floorGeo.attributes.position;
     const huecos = []; // centros de huecos puntuales
     // La cantidad de huecos escala con el nivel de inseguridad Y con el encharcado: una via
@@ -141,8 +217,10 @@ export class BaseSegment {
       // Surcos de neumatico: leve depresion en dos carriles.
       h -= Math.exp(-((x - rut) ** 2) / 0.05) * 0.06;
       h -= Math.exp(-((x + rut) ** 2) / 0.05) * 0.06;
-      // Cunetas ANCHAS: zanja marcada a ambos lados junto a la pared (~0.6 m de la pared).
-      h -= Math.exp(-((Math.abs(x) - cunetaX) ** 2) / 0.11) * 0.17;
+      // Cuneta labrada solo en los lados que le tocan a esta labor.
+      if ((x > 0 && sides.right) || (x < 0 && sides.left)) {
+        h -= Math.exp(-((Math.abs(x) - cunetaX) ** 2) / 0.11) * cunetaProf;
+      }
       // Huecos puntuales (depresiones).
       for (const hu of huecos) {
         const d2 = (x - hu.x) ** 2 + (y - hu.y) ** 2;
@@ -161,17 +239,25 @@ export class BaseSegment {
 
     // --- Parches de BARRO / LODO espeso en zonas del piso ---
     // Mucho mas lodo en las vias embarradas (encharcado alto).
+    // Igual que el shotcrete: todas las manchas del tramo van en UNA malla (mismo material,
+    // quietas). Antes eran hasta 5 geometrias y 5 llamadas de dibujo por tramo.
     const nLodo = Math.max(1, Math.round(rng.int(2, 5) * Settings.unsafeLevel * (0.6 + encharcado * 1.7)));
+    const lodos = [];
     for (let i = 0; i < nLodo; i++) {
       const r = rng.range(0.8, 2.2);
-      const lodo = new THREE.Mesh(new THREE.CircleGeometry(r, 14), MineMaterials.lodo());
-      lodo.rotation.x = -Math.PI / 2;
-      lodo.scale.set(1, rng.range(0.6, 1.4), 1);
-      lodo.position.set(
+      const geo = new THREE.CircleGeometry(r, 14);
+      geo.scale(1, rng.range(0.6, 1.4), 1);
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(
         rng.range(-this.width / 2 + 0.8, this.width / 2 - 0.8),
         0.018,
         -rng.range(0.8, this.length - 0.8)
       );
+      lodos.push(geo);
+    }
+    if (lodos.length) {
+      const lodo = new THREE.Mesh(mergeGeometries(lodos), MineMaterials.lodo());
+      for (const g of lodos) g.dispose();
       lodo.name = 'lodo';
       this.group.add(lodo);
     }
@@ -196,11 +282,11 @@ export class BaseSegment {
       return g;
     };
 
-    const aguaGeo = mergeGeometries([
-      lamina(0.7, this.width * 0.28, 0.03),     // canal central de drenaje
-      lamina(0.60, halfW - 0.42, -0.12),        // solera cuneta ANCHA derecha (junto al hastial)
-      lamina(0.60, -(halfW - 0.42), -0.12)      // solera cuneta ANCHA izquierda
-    ]);
+    const laminas = [lamina(0.7, this.width * 0.28, 0.03)];   // canal central de drenaje
+    // Solera de agua SOLO en las cunetas que existen en esta labor.
+    if (sides.right) laminas.push(lamina(0.60, halfW - 0.42, -0.12));
+    if (sides.left)  laminas.push(lamina(0.60, -(halfW - 0.42), -0.12));
+    const aguaGeo = mergeGeometries(laminas);
     // Agua CORRIENDO (md: "canal central de drenaje con agua"): el tick desplaza el normal
     // map COMPARTIDO del material → un solo offset anima el agua de toda la mina. El offset
     // se calcula desde `elapsed` (absoluto, idempotente), asi que da igual cuantos tramos
@@ -214,14 +300,15 @@ export class BaseSegment {
     this.animated.push(agua);
     this.group.add(agua);
 
-    // Bordillo que separa la calzada de la cuneta ancha (mas hacia el centro que antes).
-    const bordilloGeo = mergeGeometries([
-      new THREE.BoxGeometry(0.10, 0.11, this.length).translate(halfW - 0.92, 0.055, -this.length / 2),
-      new THREE.BoxGeometry(0.10, 0.11, this.length).translate(-(halfW - 0.92), 0.055, -this.length / 2)
-    ]);
-    const bordillos = new THREE.Mesh(bordilloGeo, MineMaterials.shotcrete(false));
-    bordillos.name = 'cuneta_bordillos';
-    this.group.add(bordillos);
+    // Bordillo que separa la calzada de la cuneta: solo donde hay cuneta labrada.
+    const bordilloPiezas = [];
+    if (sides.right) bordilloPiezas.push(new THREE.BoxGeometry(0.10, 0.11, this.length).translate(halfW - 0.92, 0.055, -this.length / 2));
+    if (sides.left)  bordilloPiezas.push(new THREE.BoxGeometry(0.10, 0.11, this.length).translate(-(halfW - 0.92), 0.055, -this.length / 2));
+    if (bordilloPiezas.length) {
+      const bordillos = new THREE.Mesh(mergeGeometries(bordilloPiezas), MineMaterials.shotcrete(false));
+      bordillos.name = 'cuneta_bordillos';
+      this.group.add(bordillos);
+    }
 
     // --- VIA MEDIO INUNDADA: en tramos muy encharcados una LAMINA de agua ancha cubre gran
     // parte de la calzada (agua estancada sobre baches y surcos). Reusa el material de agua
@@ -238,6 +325,16 @@ export class BaseSegment {
       const flood = new THREE.Mesh(g, MineMaterials.aguaCorriente());
       flood.name = 'via_inundada';
       this.group.add(flood);
+    }
+  }
+
+  /** Lados en los que esta labor lleva cuneta labrada (`variant.cuneta`). */
+  _cunetaSides() {
+    switch (this.cuneta) {
+      case 'derecha':   return { right: true,  left: false };
+      case 'izquierda': return { right: false, left: true  };
+      case 'ninguna':   return { right: false, left: false };
+      default:          return { right: true,  left: true  };
     }
   }
 

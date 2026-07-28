@@ -69,29 +69,55 @@ export const VARIETY = {
   // Pilares EXTRA elegidos por semilla (0..N de este pool de interiores libres).
   holeCandidates: ['c3_r1', 'c6_r1', 'c2_r4', 'c6_r4'],
   extraHolesMax: 2,
-  // Jitter de seccion por arista: ±fraccion sobre width/height. Amplio (±20%) para que se
-  // vean labores marcadamente mas ANGOSTAS y mas AMPLIAS (breasting/desquinche/rehabilitacion).
-  // El generador ACOTA el resultado a un rango transitable y < boca del cruce (no abre huecos).
-  sectionJitter: 0.20,
+  // Jitter de seccion por arista: ±fraccion sobre width/height. El generador ACOTA el resultado
+  // entre ANCHO_MINIMO_LABOR (paso peatonal garantizado junto al scoop) y ANCHO_PASO_INTERSECCION
+  // (boca del cruce): la labor varia de ancho sin volverse intransitable ni abrir huecos.
+  sectionJitter: 0.14,
   // Galerias que reciben LED verde neon (main): se sortea cuantas filas ademas de las fijas.
   mainRowsMin: 2,
   mainRowsMax: 3,
+  // ── VARIEDAD DE CAJA (que NINGUNA labor se vea igual a otra al recorrerla) ──
+  // Tipo de roca de la caja: cambia la rampa de color por vertice de la carcasa (ver
+  // `ROCK_TYPES` en `segments/TunnelGeometry.js`). Se sortea uno por arista.
+  rockTypes: ['caliza', 'ferruginosa', 'andesita', 'cuarcita', 'esquisto', 'mineralizada'],
+  // Probabilidad de que una galeria/crucero lleve shotcrete (el resto queda en roca expuesta).
+  shotcreteChance: { gallery: 0.35, crucero: 0.75, mainRoad: 0.5, ramp: 0.5, access: 0.2 },
+  // Configuracion de CUNETA por labor: a ambos lados, a un solo lado o sin cuneta labrada.
+  cunetaModes: ['ambas', 'derecha', 'izquierda', 'ambas', 'derecha', 'ninguna'],
 };
 
-// Dimensiones de la seccion transversal por tipo de labor (m). Tamaño real (D.S. 024-2016-EM /
-// `/mina-3d-trackless` §4): herradura, ancho×alto. Calibradas a la boca del cruce (NODE_SIZE).
+// ── SECCION DE LAS LABORES ────────────────────────────────────────────────────
+// El equipo MAS ANCHO que circula por la mina es el SCOOP/LHD (cuchara 2.95 m, maquina 2.70 m —
+// ver `src/elementos/equipos/scoop.js`). Para que una persona pueda TRANSITAR POR EL COSTADO
+// mientras el scoop pasa, la seccion se dimensiona con:
+//     cuchara 2.95 + separacion al equipo 0.60 + via peatonal libre 1.20 + cuneta/servicios 0.90
+//   ≈ 5.65 m  →  ANCHO_MINIMO_LABOR = 5.8 m, y las secciones nominales van de 6.0 a 6.8 m.
+// Asi, con el scoop en su carril SIEMPRE quedan >= 1.4 m libres para caminar al costado.
+export const EQUIPO_MAS_ANCHO = 2.95;    // cuchara del scoop de 7 m³ (el mas ancho de la flota)
+export const PASO_PEATONAL = 1.20;       // ancho libre exigido para circular al costado del equipo
+export const ANCHO_MINIMO_LABOR = 5.8;   // ninguna labor transitable baja de aqui (ni con jitter)
+// Ancho de PASO de las intersecciones: la malla del CSV se estira en planta hasta este valor
+// (`CsvIntersectionGeometry`) para que el cruce nunca sea mas angosto que la labor que llega.
+export const ANCHO_PASO_INTERSECCION = 6.8;
+
+// Dimensiones de la seccion transversal por tipo de labor (m): herradura, ancho×alto. Secciones
+// AMPLIAS de mina mecanizada (D.S. 024-2016-EM / `/mina-3d-trackless` §4), dimensionadas para que
+// el peaton circule por el costado del scoop (ver ANCHO_MINIMO_LABOR mas abajo). El alto nunca
+// supera la corona de la interseccion (5.4 m) para que la boca del cruce siempre la cubra.
 export const DIM = {
-  gallery:  { width: 5.0, height: 4.6 }, // galeria (Ga) / by-pass
-  crucero:  { width: 4.5, height: 4.4 }, // crucero (Cx)
-  mainRoad: { width: 7.0, height: 5.2 }, // via principal RN 96
-  access:   { width: 4.2, height: 4.2 }, // acceso corto a una labor (spur)
-  ramp:     { width: 5.5, height: 5.0 }, // rampa / decline
+  gallery:  { width: 6.8, height: 5.0 }, // galeria (Ga) / by-pass
+  crucero:  { width: 6.4, height: 4.9 }, // crucero (Cx)
+  mainRoad: { width: 6.8, height: 5.3 }, // via principal RN 96 (transito pesado de volquetes)
+  access:   { width: 6.0, height: 4.8 }, // acceso a una labor (spur): tambien entra el scoop
+  ramp:     { width: 6.6, height: 5.1 }, // rampa / decline
 };
 
-// Tamaño (lado, m) del bloque abierto de interseccion. La boca (size - 2*POST_T) debe superar
-// el ancho de la via principal (7 m) → size = 10.
+// Huella central usada para recortar, a escala 1:1, la malla autorada de
+// `prueba/elementos/interseccion_4_vias.csv`. Los brazos exteriores los forman las aristas.
 export const NODE_SIZE = 10.0;
-export const ROOM_SIZE = 12.0;   // sala de una labor especial (mas amplia que un crucero)
+// Longitud del tramo terminal ciego. Su ANCHO/ALTO siempre los hereda del acceso (6.0 x 4.8 m):
+// no genera camaras ni ensanches en el fondo de las labores.
+export const ROOM_SIZE = 12.0;
 export const SPUR_DIST = 24.0;   // distancia del nodo padre a la sala (deja un acceso corto)
 
 // ── RAMPA EN ESPIRAL (decline helicoidal) ──────────────────────────────────────
@@ -152,6 +178,44 @@ export const LOWER = {
   ],
 };
 
+// ── SEGUNDA RAMPA: decline del nivel 1 al nivel 2 (mas rampas / mina mas profunda) ──────────
+// Arranca en `l_b3` (esquina SE del nivel inferior) y espirala hacia el SE — zona LIBRE: el grid
+// del nivel 1 esta al N y al O de l_b3, asi que el anillo del helicoide no cruza ninguna galeria.
+export const RAMP_HELIX_2 = {
+  from: 'l_b3',
+  entryDir: 'E',
+  radius: 12,
+  turns: 1.15,
+  turnDir: -1,
+  drop: LEVEL_DROP,
+  toLevel: 2,
+  toNode: 'lower2_entry',
+  label: 'Rampa espiral −24',
+};
+
+// Nivel 2 (24 m mas abajo), compacto: cuelga del nodo de llegada de la 2ª rampa y se extiende
+// al ESTE/SUR (lado libre). Cota y=-24 → sin colision con los niveles 0 y 1 (labores apiladas).
+export const LOWER_2 = {
+  level: 2,
+  entry: 'lower2_entry',
+  nodes: [
+    { id: 'lower2_entry', dx: 0,             dz: 0 },
+    { id: 'l2_a', dx: SPACING_X,     dz: 0 },
+    { id: 'l2_b', dx: SPACING_X,     dz: -SPACING_Z },
+  ],
+  edges: [
+    ['lower2_entry', 'l2_a', 'gallery', 'Ga 132'],
+    ['l2_a',         'l2_b', 'crucero', 'Cx 988'],
+  ],
+};
+
+// DECLINES: cada bajada = una rampa espiral + su sub-grid. Se construyen EN ORDEN (cada helice
+// arranca de un nodo del nivel anterior, que ya debe existir). El generador itera esta lista.
+export const DECLINES = [
+  { helix: RAMP_HELIX,   lower: LOWER },
+  { helix: RAMP_HELIX_2, lower: LOWER_2 },
+];
+
 // LABORES ESPECIALES en fondo de saco (spurs). `dir`: N=+Z, S=-Z, E=+X, W=-X.
 // REGLA: todas cuelgan del PERIMETRO y apuntan HACIA AFUERA (no hay retICula fuera del borde →
 // jamas colisionan con una galeria/crucero). Los DOS refugios Dräger de 20 personas van en
@@ -165,13 +229,22 @@ export const SPURS = [
   // ── Norte (fila r0) → apuntan al N ──
   { from: 'c1_r0', dir: 'N', type: 'desatado',     label: 'Desatado' },
   { from: 'c2_r0', dir: 'N', type: 'subestacion',  label: 'S/E 1' },
+  { from: 'c3_r0', dir: 'N', type: 'frente',       label: 'Frente 3' },
   { from: 'c4_r0', dir: 'N', type: 'frente',       label: 'Frente 1' },
+  { from: 'c5_r0', dir: 'N', type: 'sostenimiento', label: 'Sostenim. 2' },
   { from: 'c6_r0', dir: 'N', type: 'bahia',        label: 'Bahía 1' },
-  { from: 'c7_r0', dir: 'N', type: 'sostenimiento', label: 'Sostenim.' },
+  { from: 'c7_r0', dir: 'N', type: 'sostenimiento', label: 'Sostenim. 1' },
   // ── Sur (fila r5) → apuntan al S ──
   { from: 'c1_r5', dir: 'S', type: 'shotcrete',    label: 'Shotcrete' },
   { from: 'c2_r5', dir: 'S', type: 'echadero',     label: 'Echadero' },   // descarga del HaulCycle
-  { from: 'c4_r5', dir: 'S', type: 'frente',       label: 'Frente 2' },
+  { from: 'c3_r5', dir: 'S', type: 'frente',       label: 'Frente 4' },
+  // Labor demostrativa larga: su acceso excavado queda fuera del perímetro y usa la sección
+  // facetada del wireframe. Distancia 52 m -> ~41 m reales entre la boca y la sala del frente.
+  { from: 'c4_r5', dir: 'S', type: 'frente',       label: 'Frente 2 · Labor irregular', distance: 52, wireframeStyle: true },
+  // Fase RECIÉN DISPARADA del ciclo de avance: el tope tapado por su propio muck, esperando al
+  // scoop. Completa la secuencia visible en el plano (cargado → disparado → desatado →
+  // sostenimiento → shotcrete), que antes saltaba de frente cargado a frente ya limpio.
+  { from: 'c5_r5', dir: 'S', type: 'disparado',    label: 'Frente 5 · Disparado' },
   { from: 'c6_r5', dir: 'S', type: 'bombeo',       label: 'Bombeo' },
   { from: 'c7_r5', dir: 'S', type: 'refugio',      label: 'Refugio 2' },
   // ── Este (columna RN 96, c8) → apuntan al E ──
@@ -191,5 +264,11 @@ export const VEHICLE_LOOP = [
   'c1_r0', 'c2_r0', 'c3_r0', 'c4_r0', 'c5_r0', 'c6_r0', 'c7_r0',                   // galeria norte (row 0) W→E
 ];
 
-/** Nodo donde aparece el jugador: extremo sur de la via principal (boca de acceso). */
+/**
+ * Acceso irregular donde aparece el jugador. Es la labor Frente 2, orientada hacia el sur;
+ * el yaw inicial historico (mira a -Z) deja al jugador mirando hacia el frente de avance.
+ */
+export const SPAWN_EDGE = 'edge_c4_r5_spur_frente_c4_r5';
+
+/** Nodo de respaldo si la labor inicial no existe por una futura edición del plano. */
 export const SPAWN_NODE = 'c8_r5';

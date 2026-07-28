@@ -9,11 +9,24 @@ export class Minimap {
   constructor({ bus, world, container }) {
     this._bus = bus;
     this._segments = world.segments;
+    this._mapCells = world.minimapCells || null;
+    this._mapBucketSize = 48;
+    this._mapBuckets = null;
+    if (this._mapCells?.length) {
+      this._mapBuckets = new Map();
+      for (const cell of this._mapCells) {
+        const key = `${Math.floor(cell.x / this._mapBucketSize)},${Math.floor(cell.z / this._mapBucketSize)}`;
+        if (!this._mapBuckets.has(key)) this._mapBuckets.set(key, []);
+        this._mapBuckets.get(key).push(cell);
+      }
+    }
 
     this._playerX = 0;
     this._playerZ = 0;
+    this._playerY = 0;
     this._playerYaw = 0;
     this._visible = false;
+    this._drawAccum = 0;
 
     this._canvas = null;
     this._ctx = null;
@@ -23,6 +36,7 @@ export class Minimap {
     bus.on('player:moved', ({ position, yaw }) => {
       this._playerX = position.x;
       this._playerZ = position.z;
+      this._playerY = position.y;
       if (yaw !== undefined) this._playerYaw = yaw;
     });
 
@@ -107,8 +121,11 @@ export class Minimap {
   }
 
   /** Llamado cada frame por el Loop. */
-  update() {
+  update(dt = 0) {
     if (!this._visible) return;
+    this._drawAccum += dt;
+    if (this._drawAccum < 1 / 20) return;
+    this._drawAccum = 0;
     this._draw();
   }
 
@@ -138,7 +155,28 @@ export class Minimap {
     // Rotacion: -yaw hace que el "adelante" (hacia -Z mundial) quede arriba.
     ctx.rotate(-this._playerYaw);
 
-    for (const seg of this._segments) {
+    if (this._mapCells?.length) {
+      // Mina completa: rasteriza la huella de los triangulos de piso cercanos a la cota
+      // actual. Así el radar coincide con el tunel recorrido y no mezcla niveles superpuestos.
+      const radiusWorld = R / SCALE + 4;
+      const minBX = Math.floor((this._playerX - radiusWorld) / this._mapBucketSize);
+      const maxBX = Math.floor((this._playerX + radiusWorld) / this._mapBucketSize);
+      const minBZ = Math.floor((this._playerZ - radiusWorld) / this._mapBucketSize);
+      const maxBZ = Math.floor((this._playerZ + radiusWorld) / this._mapBucketSize);
+      for (let bx = minBX; bx <= maxBX; bx++) for (let bz = minBZ; bz <= maxBZ; bz++) {
+        const bucket = this._mapBuckets.get(`${bx},${bz}`);
+        if (!bucket) continue;
+        for (const cell of bucket) {
+          if (Math.abs(cell.y - this._playerY) > 5.5) continue;
+          const relX = (cell.x - this._playerX) * SCALE;
+          const relZ = (cell.z - this._playerZ) * SCALE;
+          if (Math.abs(relX) > R + 8 || Math.abs(relZ) > R + 8) continue;
+          const size = cell.size * SCALE + 0.65;
+          ctx.fillStyle = Math.abs(cell.y - this._playerY) < 2.2 ? '#334d33' : '#263826';
+          ctx.fillRect(relX - size / 2, relZ - size / 2, size, size);
+        }
+      }
+    } else for (const seg of this._segments) {
       // Centro del tramo en mundo (los tramos de la retICula pueden estar rotados y NO
       // centrados en x=0, por eso usamos su _center y su rotacion en vez del rect fijo).
       const c = seg._center || seg.group.position;
@@ -151,7 +189,7 @@ export class Minimap {
       ctx.save();
       ctx.translate(relX, relZ);
       // Rotacion Y del mundo → rotacion inversa en canvas (x→x, z→y).
-      ctx.rotate(-(seg.group.rotation?.y || 0));
+      ctx.rotate(-(seg.minimapYaw ?? seg.group.rotation?.y ?? 0));
 
       const w = sw * SCALE;
       const h = sl * SCALE;
@@ -285,12 +323,13 @@ export class Minimap {
       case 'crossroad':    return '#344a34';
       case 'chamber':      return '#3a2a18';
       case 'refuge':       return '#1a2a3a';
-      case 'ramp':         return '#1e2a1e';
       // --- Modo retICula (réplica del plano) ---
       case 'gallery':      return '#243a24'; // galeria (Ga)
       case 'crucero':      return '#203020'; // crucero (Cx)
       case 'mainRoad':     return '#4a3d1c'; // via principal RN 96 (ambar tenue)
-      case 'ramp':         return '#3a3420'; // rampa / decline
+      // rampa / decline (aplica en modo lineal Y retICula: antes un 'case ramp' anterior lo
+      // tapaba y el decline salia con el verde de galeria en vez de este ambar terroso).
+      case 'ramp':         return '#3a3420';
       case 'access':       return '#22331f'; // acceso a una labor
       case 'node':         return '#2e4a2e'; // interseccion de 4 vias
       case 'room':         return '#3a2e46'; // sala de labor especial (violeta tenue)

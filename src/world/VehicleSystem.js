@@ -1,6 +1,31 @@
 import * as THREE from 'three';
 import { crear as crearCamion }    from '../elementos/equipos/camion.js';
 import { crear as crearCamioneta } from '../elementos/equipos/camioneta.js';
+import { crear as crearScoop }     from '../elementos/equipos/scoop.js';
+import { crear as crearMixer }     from '../elementos/equipos/mixer.js';
+import { crear as crearDesatador } from '../elementos/equipos/desatador.js';
+import { Settings } from '../core/Settings.js';
+
+// Fabricas de equipos que pueden CIRCULAR por el mapa (ademas de los que trabajan en las salas).
+const FACTORIES = {
+  camion: crearCamion, camioneta: crearCamioneta,
+  scoop: crearScoop, mixer: crearMixer, desatador: crearDesatador,
+};
+// Semilargo (m) por tipo para el distanciamiento (car-following).
+const HALFLEN = { camion: 4.4, camioneta: 3.0, scoop: 5.3, mixer: 4.6, desatador: 5.4 };
+const HALFWIDTH = { camion: 1.25, camioneta: 1.05, scoop: 1.35, mixer: 1.28, desatador: 1.38 };
+
+/** Prueba 2D orientada: evita confundir equipos largos en carriles paralelos con un choque. */
+export function vehicleFootprintsOverlap(a, b) {
+  const dx = b.mesh.position.x - a.mesh.position.x;
+  const dz = b.mesh.position.z - a.mesh.position.z;
+  const forwardX = Math.sin(a._yaw);
+  const forwardZ = Math.cos(a._yaw);
+  const along = Math.abs(dx * forwardX + dz * forwardZ);
+  const across = Math.abs(dx * forwardZ - dz * forwardX);
+  return along < (a.halfLen + b.halfLen) * 0.82 &&
+    across < (a.halfWidth + b.halfWidth) * 0.92;
+}
 
 /**
  * VehicleSystem — gestiona el trafico de vehiculos en toda la mina.
@@ -29,15 +54,27 @@ import { crear as crearCamioneta } from '../elementos/equipos/camioneta.js';
 // Las fases empiezan en 0.14+ para que ningun vehiculo aparezca cerca del spawn.
 // Flota AMPLIADA (8 equipos) para el mapa mas grande: mas trafico atravesando los cruceros,
 // escalonado a lo largo de todo el trazado para que siempre haya equipos en movimiento cerca.
+// Flota MIXTA que recorre TODO el trazado, escalonada. Incluye equipo PESADO que ademas de
+// trabajar en las labores tambien se traslada por el mapa: SCOOPS con la cuchara CARGADA de muck
+// (pose de acarreo), MIXERS y un SCALER.
+//
+// CARRIL: por defecto 1.15 m a la DERECHA del eje de la via. Con las labores ampliadas (6.0-6.8 m)
+// el equipo mas ancho (scoop, 2.95 m de cuchara) queda a ~0.8 m de su hastial — el minimo legal —
+// y deja ~3 m libres del otro lado, que es por donde el peaton lo pasa sin meterse bajo la
+// cuchara. Con el carril centrado (0.9) ese margen era mas justo a ambos lados.
 const FLOTA = [
-  { factory: 'camioneta', lane: 0.9, speed: 4.2, phase: 0.14 },
-  { factory: 'camion',    lane: 0.9, speed: 2.5, phase: 0.26 },
-  { factory: 'camioneta', lane: 0.9, speed: 3.8, phase: 0.38 },
-  { factory: 'camion',    lane: 0.9, speed: 2.8, phase: 0.50 },
-  { factory: 'camioneta', lane: 0.9, speed: 4.0, phase: 0.62 },
-  { factory: 'camion',    lane: 0.9, speed: 2.6, phase: 0.74 },
-  { factory: 'camioneta', lane: 0.9, speed: 3.5, phase: 0.86 },
-  { factory: 'camion',    lane: 0.9, speed: 3.0, phase: 0.95 },
+  { factory: 'camioneta', speed: 4.2, phase: 0.05 },
+  { factory: 'scoop',     speed: 2.6, phase: 0.13 },
+  { factory: 'camion',    speed: 2.6, phase: 0.21 },
+  { factory: 'mixer',     speed: 2.9, phase: 0.29 },
+  { factory: 'camioneta', speed: 3.9, phase: 0.37 },
+  { factory: 'scoop',     speed: 2.5, phase: 0.46 },
+  { factory: 'desatador', speed: 2.7, phase: 0.54 },
+  { factory: 'camion',    speed: 2.8, phase: 0.62 },
+  { factory: 'scoop',     speed: 2.7, phase: 0.70 },
+  { factory: 'camioneta', speed: 3.6, phase: 0.78 },
+  { factory: 'mixer',     speed: 3.0, phase: 0.86 },
+  { factory: 'camion',    speed: 3.0, phase: 0.94 },
 ];
 
 // Radio de redondeo de esquina (m) y puntos del arco. 3.4 m entra holgado en un nodo de 10 m.
@@ -61,6 +98,11 @@ export class VehicleSystem {
     this.bus   = bus;
     this._npcs = [];           // lista de NPC (set via setNpcs)
     this._hornTimers = [];     // cooldown de claxon por vehiculo (segundos)
+
+    // Posicion del jugador para el CULLING por distancia (mismo criterio que los NPC): los
+    // equipos cuelgan de la escena, no de un tramo, asi que el streaming del mundo no los oculta.
+    this._playerPos = new THREE.Vector3();
+    bus?.on?.('player:moved', ({ position }) => this._playerPos.copy(position));
 
     // ---- Construye la ruta como lista de puntos mundo ----
     let pts;
@@ -93,14 +135,22 @@ export class VehicleSystem {
     this._right = new THREE.Vector3();
 
     // ---- Crea y posiciona la flota ----
-    this._fleet = FLOTA.map(cfg => {
-      const mesh = cfg.factory === 'camion' ? crearCamion() : crearCamioneta();
+    const fleetConfig = FLOTA.slice(0, world.vehicleFleetLimit ?? FLOTA.length);
+    this._fleet = fleetConfig.map(cfg => {
+      const mesh = (FACTORIES[cfg.factory] || crearCamioneta)();
+      // SCOOP rodante: cuchara CARGADA en pose de acarreo (brazo a media altura, cuchara
+      // recogida) — el muck ya viene modelado en la cuchara. Se saca del ciclo demo (auto).
+      if (cfg.factory === 'scoop') {
+        const api = mesh.userData.scoop;
+        if (api) { api.setManual?.(); api.boom = 0.35; api.bucket = 1.0; }
+      }
       scene.add(mesh);
       const dist = cfg.phase * this._totalLen;
       const { dir } = this._samplePath(dist, this._s0);
       const v = {
-        mesh, lane: cfg.lane, speed: cfg.speed, dist, _t: 0,
-        halfLen: cfg.factory === 'camion' ? 4.4 : 3.0,  // semilargo para el distanciamiento
+        mesh, lane: cfg.lane ?? 1.15, speed: cfg.speed, dist, _t: 0,
+        halfLen: HALFLEN[cfg.factory] ?? 3.0,   // semilargo para el distanciamiento
+        halfWidth: HALFWIDTH[cfg.factory] ?? 1.2,
         _yaw: Math.atan2(dir.x, dir.z),  // direccion suavizada (volante)
         _speedF: 1,                      // factor de velocidad (frena en curvas)
         _roll: 0,                        // inclinacion de carroceria
@@ -111,6 +161,7 @@ export class VehicleSystem {
       return v;
     });
     this._hornTimers = this._fleet.map(() => 0);
+    this._stopTimer  = this._fleet.map(() => 0);   // segundos de paro por CHOQUE (0 = circulando)
   }
 
   /** Recibe la lista de NPC activos para chequear proximidad. */
@@ -272,10 +323,11 @@ export class VehicleSystem {
     return this._fleet.map(v => ({
       object: v.mesh,
       live: true,
-      warn:  v.mesh.name === 'camion' ? 7   : 5,
+      // Equipo PESADO (camion/scoop/mixer/scaler) avisa mas lejos que una camioneta.
+      warn:  v.mesh.name === 'camioneta' ? 5 : 7,
       hurt:  0.5,    // contacto con equipo en movimiento = GOLPE (no fatal), no muerte
-      aviso:    v.mesh.userData.hazard.aviso,
-      reflexion: v.mesh.userData.hazard.reflexion,
+      aviso:    v.mesh.userData.hazard?.aviso,
+      reflexion: v.mesh.userData.hazard?.reflexion,
       tipo: 'atropello'
     }));
   }
@@ -287,12 +339,48 @@ export class VehicleSystem {
     const vehPos = this._fleet.map(v => v.mesh.position);
     for (const p of extras) vehPos.push(p);
 
+    // Reparte las posiciones de vehiculos a cada NPC UNA sola vez por frame. Antes esto se hacia
+    // dentro del doble bucle (vehiculo × NPC), reasignando el MISMO array N×M veces por frame.
+    for (const npc of this._npcs) if (npc.alive) npc.setVehiclePositions(vehPos);
+
+    // ── CHOQUE entre equipos en movimiento ──────────────────────────────────────
+    // La antigua prueba circular marcaba como chocados equipos que circulaban en carriles
+    // paralelos. Ahora se compara su huella orientada y solo uno cede brevemente.
+    for (let i = 0; i < this._fleet.length; i++) {
+      if (this._fleet[i]._manual) continue;
+      for (let j = i + 1; j < this._fleet.length; j++) {
+        if (this._fleet[j]._manual) continue;
+        if (vehicleFootprintsOverlap(this._fleet[i], this._fleet[j])) {
+          const yielding = this._fleet[i].dist > this._fleet[j].dist ? i : j;
+          this._stopTimer[yielding] = Math.max(this._stopTimer[yielding], 1.8);
+        }
+      }
+    }
+
+    // Fuera de la distancia de dibujado el equipo esta detras de la niebla negra: se oculta y se
+    // le salta la animacion. Un scoop son ~1.200 mallas y su `tick` reorienta toda la hidraulica
+    // (con `updateWorldMatrix` incluido) — hacerlo para equipos que nadie ve era puro gasto. El
+    // RECORRIDO sigue avanzando: el trafico permanece coherente y al acercarse ya esta donde toca.
+    const cull = Settings.current.drawDistance + 20;
+
     for (let i = 0; i < this._fleet.length; i++) {
       const v = this._fleet[i];
+      // El equipo que conduce el jugador nunca se oculta (lo anima el DriveController).
+      const cerca = v._manual || v.mesh.position.distanceTo(this._playerPos) <= cull;
+      if (v.mesh.visible !== cerca) v.mesh.visible = cerca;
 
       // Conducido por el jugador: el DriveController lo mueve/anima; aqui solo se
       // mantienen los chequeos de claxon/atropello de NPCs (mas abajo).
-      if (!v._manual) {
+      if (!v._manual && this._stopTimer[i] > 0) {
+        // Cesion breve por contacto real: el otro equipo conserva el paso y despeja la zona.
+        this._stopTimer[i] -= dt;
+        v._t += dt;
+        v.mesh.userData._speed = 0;
+        v.mesh.userData._steer = 0;
+        v._speedF = 0;
+        // Baliza/hidraulica siguen animando aunque este parado — pero solo si se ve.
+        if (cerca) v.mesh.userData.tick?.(dt, v._t);
+      } else if (!v._manual) {
         // --- Anticipacion de curva: compara el rumbo actual con el de unos metros adelante.
         const now   = this._samplePath(v.dist, this._s0);
         const ahead = this._samplePath(v.dist + LOOKAHEAD, this._s1);
@@ -350,7 +438,7 @@ export class VehicleSystem {
         // DIRECCION (-1..1) derivada del giro real: los equipos ARTICULADOS doblan su bastidor
         // delantero por el pasador central. Los rigidos (camion/camioneta) lo ignoran.
         v.mesh.userData._steer = THREE.MathUtils.clamp(yawRate * 1.6, -1, 1);
-        v.mesh.userData.tick?.(dt, v._t);
+        if (cerca) v.mesh.userData.tick?.(dt, v._t);
 
         // Acarreo: los CAMIONES se cargan al pasar por la camara y descargan en el echadero.
         const carga = v.mesh.userData.carga;
@@ -365,7 +453,6 @@ export class VehicleSystem {
       this._hornTimers[i] = Math.max(0, this._hornTimers[i] - dt);
       for (const npc of this._npcs) {
         if (!npc.alive) continue;
-        npc.setVehiclePositions(vehPos);
 
         const dx = npc.object.position.x - v.mesh.position.x;
         const dz = npc.object.position.z - v.mesh.position.z;

@@ -3,6 +3,7 @@ import { createHelicalTunnelShell, createHelicalFloorBerma } from '../segments/T
 import { MineMaterials } from '../materials/MineMaterials.js';
 import { createHangingBulb } from '../../lighting/HangingBulb.js';
 import { crearSenal } from '../../elementos/senal/senal.js';
+import { geometriaCharco, materialCharco } from '../../elementos/entorno/charco.js';
 
 /**
  * HelicalRampSegment — RAMPA EN ESPIRAL (decline helicoidal) que conecta dos niveles.
@@ -27,10 +28,11 @@ export class HelicalRampSegment {
    * @param {object} o.lighting  rig de luces (canAddLight/noteLight)
    * @param {import('../../procedural/Rng.js').Rng} o.rng
    */
-  constructor({ helix, dim, lighting, rng }) {
+  constructor({ helix, dim, lighting, rng, variant = null }) {
     this.helix = helix;
     this.width = dim.width;
     this.height = dim.height;
+    this.variant = variant || {};
     this.lighting = lighting;
     this.rng = rng;
 
@@ -54,7 +56,10 @@ export class HelicalRampSegment {
     // ── Carcasa curva (roca) ──
     const shellGeo = createHelicalTunnelShell({
       width: this.width, height: this.height, radius, startAngle, totalAngle, drop,
-      rows, jitter: 0.42, rng: () => this.rng.next()
+      rows, jitter: 0.42,
+      archRatio: this.variant.archRatio ?? 0.40,
+      rockType: this.variant.rockType ?? 'caliza',
+      rng: () => this.rng.next()
     });
     const shell = new THREE.Mesh(shellGeo, MineMaterials.rocaTunel());
     shell.receiveShadow = true;
@@ -98,6 +103,9 @@ export class HelicalRampSegment {
       this.group.add(s);
     } catch { /* decorativo: nunca rompe el build */ }
 
+    // ── Sostenimiento + servicios + refugios: que la rampa se vea como una LABOR ──
+    this._decorate();
+
     this.group.position.set(axis.x, topY, axis.z);
 
     // ── Spans de colision/contencion (cadena de tramos rectos inclinados) ──
@@ -111,6 +119,91 @@ export class HelicalRampSegment {
       axis.z + radius * Math.sin(midTh)
     );
     return this;
+  }
+
+  /**
+   * DECORA la rampa como una labor real: pernos de sostenimiento (InstancedMesh) en el arco,
+   * charcos reflectivos en el piso, una corrida de cable por el hastial y balizas de REFUGIO a
+   * intervalos. Todo en coordenadas LOCALES (el grupo se posiciona despues). Barato: 2-3 draw
+   * calls instanciados + 1 tubo; se oculta con el streaming cuando la rampa esta lejos.
+   */
+  _decorate() {
+    const { radius, startAngle, totalAngle, drop } = this.helix;
+    const H = this.height, halfW = this.width / 2;
+    const arcLen = Math.abs(totalAngle) * radius;
+    const g = this.group;
+    const up = new THREE.Vector3(0, 1, 0);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), scl = new THREE.Vector3(1, 1, 1);
+    const pos = new THREE.Vector3(), inward = new THREE.Vector3(), ctr = new THREE.Vector3();
+
+    // Marco local (centro del piso + direccion radial = ancho de la seccion) en la fraccion f.
+    const frame = (f) => {
+      const th = startAngle + totalAngle * f;
+      return {
+        c: new THREE.Vector3(radius * Math.cos(th), -drop * f, radius * Math.sin(th)),
+        radial: new THREE.Vector3(Math.cos(th), 0, Math.sin(th)),
+        th
+      };
+    };
+
+    // ── Pernos + placas de sostenimiento en el arco (2 InstancedMesh) ──
+    const rings = Math.max(6, Math.round(arcLen / 2.6));
+    const cross = [{ x: -0.85, y: 0.60 }, { x: -0.45, y: 0.92 }, { x: 0, y: 1.0 }, { x: 0.45, y: 0.92 }, { x: 0.85, y: 0.60 }];
+    const n = rings * cross.length;
+    const bMat = MineMaterials.aceroOxidado();
+    const pernos = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.03, 0.26, 6), bMat, n);
+    const placas = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.16, 0.03), bMat, n);
+    let ii = 0;
+    for (let r = 0; r < rings; r++) {
+      const { c, radial } = frame((r + 0.5) / rings);
+      ctr.copy(c).addScaledVector(up, H * 0.5);
+      for (const cr of cross) {
+        pos.copy(c).addScaledVector(radial, cr.x * halfW).addScaledVector(up, cr.y * H);
+        inward.copy(ctr).sub(pos).normalize();
+        q.setFromUnitVectors(up, inward);
+        m.compose(pos, q, scl); placas.setMatrixAt(ii, m);
+        pos.addScaledVector(inward, 0.13);
+        m.compose(pos, q, scl); pernos.setMatrixAt(ii, m);
+        ii++;
+      }
+    }
+    pernos.instanceMatrix.needsUpdate = placas.instanceMatrix.needsUpdate = true;
+    pernos.name = 'ramp_pernos'; g.add(pernos); g.add(placas);
+
+    // ── Charcos reflectivos en el piso (InstancedMesh) ──
+    const nCh = Math.max(4, Math.round(arcLen / 6));
+    const charcos = new THREE.InstancedMesh(geometriaCharco(), materialCharco(), nCh);
+    for (let i = 0; i < nCh; i++) {
+      const { c, radial } = frame((i + 0.5) / nCh);
+      pos.copy(c).addScaledVector(radial, Math.sin(i * 2.3) * halfW * 0.5); pos.y += 0.02;
+      scl.set(0.9 + (i % 3) * 0.4, 1, 0.7 + (i % 2) * 0.5);
+      m.compose(pos, q.identity(), scl); charcos.setMatrixAt(i, m);
+    }
+    charcos.instanceMatrix.needsUpdate = true; charcos.name = 'ramp_charcos'; g.add(charcos);
+    scl.set(1, 1, 1);
+
+    // ── Corrida de CABLE por el hastial (tubo que sigue la curva) ──
+    const steps = Math.max(12, rings);
+    const cablePts = [];
+    for (let i = 0; i <= steps; i++) {
+      const { c, radial } = frame(i / steps);
+      cablePts.push(c.clone().addScaledVector(radial, halfW * 0.92).addScaledVector(up, H * 0.78));
+    }
+    const tube = new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cablePts), steps, 0.05, 6, false),
+      new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.85, metalness: 0.1 })
+    );
+    tube.name = 'ramp_cable'; g.add(tube);
+
+    // ── Balizas de REFUGIO peatonal a lo largo de la rampa (cada ~20 m; bloom en la oscuridad) ──
+    const nRef = Math.max(1, Math.round(arcLen / 20));
+    const beaconMat = new THREE.MeshStandardMaterial({ color: 0x0a3d1a, emissive: 0x35ff55, emissiveIntensity: 2.6, roughness: 0.5 });
+    for (let i = 0; i < nRef; i++) {
+      const { c, radial } = frame((i + 0.5) / nRef);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), beaconMat);
+      b.position.copy(c).addScaledVector(radial, halfW - 0.1).addScaledVector(up, 2.0);
+      b.name = 'ramp_refugio'; g.add(b);
+    }
   }
 
   /**
