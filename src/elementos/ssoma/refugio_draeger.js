@@ -215,14 +215,26 @@ export const recorrido = {
         'Superficies claras y lavables: facilitan la limpieza y la inspección periódica ' +
         'exigida al refugio.'
     },
-    {
-      sub: 'senaletica_interior', yaw: 72, pitch: 8, dist: 0.95, dur: 6,
-      titulo: '19 · Señalética interior',
-      texto:
-        'Instructivos de uso del baño químico y de los consumibles, planos de rescate del ' +
-        'nivel, rotulación de SALIDA / EXIT en la puerta y prohibición de fuego. Todo el ' +
-        'procedimiento queda a la vista de los 20 ocupantes.'
-    },
+    // ── SEÑALÉTICA INTERIOR, LETRERO POR LETRERO ────────────────────────────
+    // Cada rótulo es un subelemento propio y se visita por separado: agrupados no se leía
+    // ninguno (ver la nota en el bloque de construcción de los letreros). Estos pasos no llevan
+    // `texto`: heredan la descripción del subelemento, que es la misma ficha que muestra el
+    // visor al aislarlo desde la lista.
+    //
+    // El YAW es aquí una restricción de VISIBILIDAD, no una preferencia estética: los letreros
+    // son planos de una cara pegados al hastial mirando hacia adentro, así que la cámara tiene
+    // que quedar del lado interior. Pared +Z (costado del logo) ⇒ yaw NEGATIVO; pared −Z
+    // (costado del acceso) ⇒ yaw POSITIVO. Se mantiene dentro de ±20° de la normal para que el
+    // rótulo no se lea escorzado.
+    { sub: 'letrero_tanque_co',            yaw: -100, pitch: -2, dist: 1.05, dur: 5,   titulo: '19 · Letrero — tanque de monóxido' },
+    { sub: 'letrero_catalizador_co',       yaw:  -84, pitch: -2, dist: 1.05, dur: 5,   titulo: '20 · Letrero — catalizador de CO' },
+    { sub: 'letrero_raciones_alimentos',   yaw:  -96, pitch: -3, dist: 0.95, dur: 7.5, titulo: '21 · Instructivo — raciones alimenticias' },
+    { sub: 'letrero_raciones_agua',        yaw:  -86, pitch: -3, dist: 0.95, dur: 7,   titulo: '22 · Instructivo — raciones de agua' },
+    { sub: 'letrero_procedimiento_o2',     yaw:   92, pitch:  0, dist: 0.95, dur: 7,   titulo: '23 · Cartel — suministro de oxígeno' },
+    { sub: 'letrero_diagrama_agua',        yaw:   84, pitch: -2, dist: 1.05, dur: 5,   titulo: '24 · Letrero — diagrama de agua' },
+    { sub: 'letrero_procedimiento_ingreso', yaw:  96, pitch: -2, dist: 1.05, dur: 5.5, titulo: '25 · Letrero — procedimiento de ingreso' },
+    { sub: 'plano_rescate_nivel',          yaw:   88, pitch:  0, dist: 1.0,  dur: 7,   titulo: '26 · Plano — esquema de rescate NV-1600' },
+    { sub: 'plano_ubicacion_refugios',     yaw:   94, pitch:  0, dist: 1.0,  dur: 6,   titulo: '27 · Plano — ubicación de refugios' },
     {
       sub: null, yaw: -142, pitch: 26, dist: 1.15, dur: 8,
       titulo: 'Conjunto — procedimiento de uso',
@@ -352,35 +364,45 @@ function _texturaPuerta() {
 }
 
 /**
- * Rotulación de la cara INTERIOR de la puerta de salida (foto real):
- * borde negro redondeado, "SALIDA" arriba, "EXIT" bajo el ojo de buey,
- * flechas curvas negras y pictograma rojo de PROHIBIDO FUEGO.
+ * Rotulación de una cara INTERIOR de puerta estanca, vista desde la precámara
+ * (fotos reales): la palabra en castellano CURVADA sobre el aro del ojo de buey
+ * —así está pintada con plantilla, cada letra girada sobre el arco— la palabra
+ * en inglés recta bajo el ojo, y las dos flechas negras de giro de manija.
+ *
+ * Las dos hojas de la esclusa usan la misma plantilla con distinto texto:
+ * la que da a la mina rotula ENTRADA/ENTRY y la que da a la cámara SALIDA/EXIT.
+ *
+ * @param {string} sup  palabra curvada sobre el ojo de buey
+ * @param {string} inf  palabra recta bajo el ojo de buey
+ * @param {'der'|'izq'} lado  costado en el que van las flechas: el LIBRE, opuesto
+ *   a la manija, que cambia de mano según la cara de la hoja que se mire
  */
-function _texturaPuertaSalida() {
+function _texturaPuertaInterior(sup = 'SALIDA', inf = 'EXIT', lado = 'der') {
   const { canvas, ctx } = _lienzo(512, 1024);
   ctx.clearRect(0, 0, 512, 1024);
   ctx.fillStyle = '#1c1c1a';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  // "SALIDA" CURVADO siguiendo el aro del ojo de buey (así está pintado con plantilla en la
-  // foto: cada letra girada sobre el arco) y "EXIT" recto justo debajo del ojo.
+  // Palabra superior curvada sobre el arco del ojo de buey. El ángulo total se
+  // reparte entre las letras, así que un rótulo más largo abre más el arco pero
+  // conserva el mismo tamaño de letra que el corto.
   ctx.font = 'bold 62px Arial, sans-serif';
   ctx.textBaseline = 'middle';
-  const arco = 1.15, radio = 210, cyOjo = 250;      // centro del ojo de buey en el lienzo
-  const salida = 'SALIDA';
+  const radio = 210, cyOjo = 250;                   // centro del ojo de buey en el lienzo
+  const arco = 0.23 * (sup.length - 1);
   ctx.save();
   ctx.translate(256, cyOjo);
-  for (let i = 0; i < salida.length; i++) {
-    const a = -arco / 2 + (arco / (salida.length - 1)) * i;
+  for (let i = 0; i < sup.length; i++) {
+    const a = sup.length > 1 ? -arco / 2 + (arco / (sup.length - 1)) * i : 0;
     ctx.save();
     ctx.rotate(a);
-    ctx.fillText(salida[i], 0, -radio);
+    ctx.fillText(sup[i], 0, -radio);
     ctx.restore();
   }
   ctx.restore();
   ctx.textBaseline = 'alphabetic';
   ctx.font = 'bold 58px Arial, sans-serif';
-  ctx.fillText('EXIT', 256, 378);
+  ctx.fillText(inf, 256, 378);
   // Flechas negras de GIRO DE LA MANIJA: cola a la izquierda, codo y punta
   // hacia arriba (indican el sentido para desenclavar).
   const flechaGiro = (cx, cy, s) => {
@@ -400,8 +422,9 @@ function _texturaPuertaSalida() {
     ctx.closePath();
     ctx.fill();
   };
-  flechaGiro(368, 516, 1.0);
-  flechaGiro(368, 800, 1.0);
+  const xFlecha = lado === 'izq' ? 144 : 368;
+  flechaGiro(xFlecha, 516, 1.0);
+  flechaGiro(xFlecha, 800, 1.0);
   return canvas;
 }
 
@@ -1923,6 +1946,155 @@ function _banoQuimico() {
   return g;
 }
 
+/**
+ * Perfil de un MARCO DE PUERTA calado: rectángulo exterior con el vano
+ * recortado, extruido para darle canto. Se usa en las dos hojas de la esclusa;
+ * como caja maciza el marco tapaba la hoja por una de sus caras.
+ * El extruido va a lo largo de +Z local: colócalo con `rotation.y = ±π/2`.
+ *
+ * @param {number} anchoExt  ancho total del marco
+ * @param {number} altoExt   alto total del marco
+ * @param {number} anchoVano ancho del hueco
+ * @param {number} altoVano  alto del hueco
+ * @param {number} canto     espesor del marco
+ */
+function _perfilMarcoPuerta(anchoExt, altoExt, anchoVano, altoVano, canto) {
+  const perfil = new THREE.Shape();
+  perfil.moveTo(-anchoExt / 2, -altoExt / 2);
+  perfil.lineTo( anchoExt / 2, -altoExt / 2);
+  perfil.lineTo( anchoExt / 2,  altoExt / 2);
+  perfil.lineTo(-anchoExt / 2,  altoExt / 2);
+  perfil.closePath();
+  const vano = new THREE.Path();
+  vano.moveTo(-anchoVano / 2, -altoVano / 2);
+  vano.lineTo( anchoVano / 2, -altoVano / 2);
+  vano.lineTo( anchoVano / 2,  altoVano / 2);
+  vano.lineTo(-anchoVano / 2,  altoVano / 2);
+  vano.closePath();
+  perfil.holes.push(vano);
+  return new THREE.ExtrudeGeometry(perfil, { depth: canto, bevelEnabled: false });
+}
+
+/**
+ * Cara INTERIOR de una puerta estanca vista desde la precámara (fotos reales):
+ * rotulación, ojo de buey con brida atornillada de 12 pernos y aro de bronce,
+ * travesaños y marco en relieve, y manija de palanca con cubo, uñas de
+ * enclavamiento y retén.
+ *
+ * Las dos hojas de la esclusa comparten construcción, así que se arma una vez y
+ * se instancia por cara; `s` dice hacia dónde mira esa cara, para levantar el
+ * herraje sobre ella sin duplicar el código espejado.
+ *
+ * @param {THREE.Group} pivote  grupo de la hoja, con origen en el canto de BISAGRAS
+ * @param {object} o
+ * @param {number} o.alto    alto de la hoja
+ * @param {number} o.ancho   ancho de la hoja; ocupa z ∈ [−ancho, 0] en el pivote
+ * @param {number} o.xCara   plano de la cara tratada, en X local del pivote
+ * @param {number} o.s       +1 si la cara mira a +X local, −1 si mira a −X
+ * @param {string} o.sup     rótulo curvado sobre el ojo ("ENTRADA" / "SALIDA")
+ * @param {string} o.inf     rótulo recto bajo el ojo ("ENTRY" / "EXIT")
+ * @param {{chapa:THREE.Material, marco:THREE.Material, cromo:THREE.Material}} o.mats
+ */
+function _caraPuertaEstanca(pivote, { alto, ancho, xCara, s, sup, inf, mats }) {
+  const zc = -ancho / 2;                       // eje de la hoja en Z local
+  const fuera = (k) => xCara + s * k;          // separación hacia fuera de la cara
+  const giro = s * Math.PI / 2;                // orientación de planos y discos
+
+  // ── rotulación (opcional: la cara que mira a la cámara principal va lisa) ──
+  if (sup) {
+    const decal = new THREE.Mesh(
+      new THREE.PlaneGeometry(ancho - 0.06, alto - 0.06),
+      new THREE.MeshStandardMaterial({
+        map: _aTextura(_texturaPuertaInterior(sup, inf, s > 0 ? 'izq' : 'der')),
+      transparent: true, roughness: 0.6
+      })
+    );
+    decal.rotation.y = giro;
+    decal.position.set(fuera(0.006), alto / 2, zc);
+    pivote.add(decal);
+  }
+
+  // ── ojo de buey: brida clara + aro de bronce + 12 pernos + vidrio oscuro ──
+  const yOjo = alto - 0.42;
+  const brida = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.030, 10, 24), mats.chapa);
+  brida.rotation.y = giro;
+  brida.position.set(fuera(0.008), yOjo, zc);
+  pivote.add(brida);
+  const aroBronce = new THREE.Mesh(
+    new THREE.TorusGeometry(0.128, 0.011, 8, 22),
+    MineMaterials.plano(0x9a7a32, { rough: 0.4, metal: 0.75 })
+  );
+  aroBronce.rotation.y = giro;
+  aroBronce.position.set(fuera(0.010), yOjo, zc);
+  pivote.add(aroBronce);
+  for (let i = 0; i < 12; i++) {
+    const ang = (i / 12) * Math.PI * 2;
+    const perno = new THREE.Mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 0.016, 8), mats.cromo);
+    perno.rotation.z = Math.PI / 2;
+    perno.position.set(fuera(0.022), yOjo + Math.sin(ang) * 0.172, zc + Math.cos(ang) * 0.172);
+    pivote.add(perno);
+  }
+  const vidrio = new THREE.Mesh(
+    new THREE.CircleGeometry(0.122, 22),
+    new THREE.MeshStandardMaterial({
+      color: 0x262e2a, emissive: 0x4a4028, emissiveIntensity: 0.22,
+      roughness: 0.5, metalness: 0.08, transparent: true, opacity: 0.96, side: THREE.DoubleSide
+    })
+  );
+  vidrio.rotation.y = giro;
+  vidrio.position.set(fuera(0.010), yOjo, zc);
+  pivote.add(vidrio);
+
+  // ── travesaños y marco en relieve (la hoja queda dividida en tres paños) ──
+  for (const ty of [alto * 0.57, alto * 0.31]) {
+    const trav = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.035, ancho - 0.06), mats.chapa);
+    trav.position.set(fuera(0.011), ty, zc);
+    pivote.add(trav);
+  }
+  for (const [largo, grosor, my, mz] of [
+    [ancho - 0.06, 0.026, alto - 0.035, zc],
+    [ancho - 0.06, 0.026, 0.035, zc],
+    [0.026, alto - 0.09, alto / 2, -0.035],
+    [0.026, alto - 0.09, alto / 2, -ancho + 0.035]
+  ]) {
+    const marcoRel = new THREE.Mesh(new THREE.BoxGeometry(0.018, grosor, largo), mats.chapa);
+    marcoRel.position.set(fuera(0.009), my, mz);
+    pivote.add(marcoRel);
+  }
+
+  // ── manija de palanca en el canto de cierre (opuesto a las bisagras) ──
+  const yMan = alto * 0.53, zCubo = -ancho + 0.13;
+  const cubo = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.078, 0.058, 20), mats.chapa);
+  cubo.rotation.z = Math.PI / 2;
+  cubo.position.set(fuera(0.032), yMan, zCubo);
+  cubo.castShadow = true;
+  pivote.add(cubo);
+  const tornillo = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.014, 8), mats.cromo);
+  tornillo.rotation.z = Math.PI / 2;
+  tornillo.position.set(fuera(0.064), yMan, zCubo);
+  pivote.add(tornillo);
+  const brazo = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.46, 12), mats.chapa);
+  brazo.rotation.x = Math.PI / 2;
+  brazo.position.set(fuera(0.042), yMan, zCubo + 0.25);
+  brazo.castShadow = true;
+  pivote.add(brazo);
+  const punta = new THREE.Mesh(new THREE.SphereGeometry(0.021, 12, 8), mats.chapa);
+  punta.position.set(fuera(0.042), yMan, zCubo + 0.48);
+  pivote.add(punta);
+  // uñas de enclavamiento en acero desnudo: pintadas del crema de la hoja se
+  // perderían contra ella
+  for (const [uz, ua] of [[-0.038, 0.22], [0.058, -0.14]]) {
+    const una = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.15, 0.040), mats.marco);
+    una.position.set(fuera(0.042), yMan - 0.145, zCubo + uz);
+    una.rotation.x = ua;
+    una.castShadow = true;
+    pivote.add(una);
+  }
+  const reten = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.038, 0.04), mats.marco);
+  reten.position.set(fuera(0.018), yMan - 0.035, zCubo + 0.30);
+  pivote.add(reten);
+}
+
 /** Film transparente que envuelve la mercadería estibada (fotos reales). */
 function _matFilm() {
   return new THREE.MeshStandardMaterial({
@@ -2353,12 +2525,15 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   dintel.position.set(xF, y0 + puertaH + (H - puertaH) / 2, doorZ);
   S.add(dintel);
 
-  // Marco de puerta NEGRO (junta/sello redondeado de la foto)
+  // Marco de puerta NEGRO (junta/sello de la foto). Va CALADO: como caja maciza
+  // tapaba la hoja por la cara de la esclusa y no dejaba ver ni su rotulación ni
+  // su herraje desde dentro del refugio.
   const marco = new THREE.Mesh(
-    new THREE.BoxGeometry(0.06, puertaH + 0.12, puertaW + 0.12),
+    _perfilMarcoPuerta(puertaW + 0.12, puertaH + 0.12, puertaW - 0.02, puertaH - 0.02, 0.06),
     MineMaterials.plano(0x1f1f1c, { rough: 0.6, metal: 0.3 })
   );
-  marco.position.set(xF + 0.01, y0 + puertaH / 2, doorZ);
+  marco.rotation.y = Math.PI / 2;                 // extruido a lo largo de X
+  marco.position.set(xF - 0.02, y0 + puertaH / 2, doorZ);
   S.add(marco);
 
   // Puerta con bisagras en +Z (izquierda del observador, como la foto) — pivote
@@ -2377,28 +2552,26 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   rotulo.rotation.y = Math.PI / 2;
   rotulo.position.set(0.037, puertaH / 2, -puertaW / 2);
   puertaPivote.add(rotulo);
-  // ── Cara INTERIOR de esta misma hoja: "SALIDA / EXIT" + flechas de giro de manija ──
-  //  Va AQUÍ y no en la puerta interior: ésta es la hoja por la que se SALE del refugio, y el
-  //  rótulo tiene que leerse desde dentro de la esclusa, que es donde está quien va a salir.
-  //  La cara exterior lleva "ENTRADA / ENTRY" (ver `_texturaPuerta`): una cara por sentido.
-  const rotuloSalida = new THREE.Mesh(
-    new THREE.PlaneGeometry(puertaW - 0.06, puertaH - 0.06),
-    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPuertaSalida()), transparent: true, roughness: 0.6 })
-  );
-  rotuloSalida.rotation.y = -Math.PI / 2;
-  rotuloSalida.position.set(-0.037, puertaH / 2, -puertaW / 2);
-  puertaPivote.add(rotuloSalida);
-  // ojo de buey (porthole)
+  // ── Cara hacia la ESCLUSA de esta misma hoja: "SALIDA / EXIT" + herraje ──
+  //  En las fotos de la precámara las DOS hojas están rotuladas. Desde la esclusa, ÉSTA es la
+  //  que da a la mina: por ella se SALE del refugio. La del mamparo, que devuelve a la cámara,
+  //  lleva ENTRADA/ENTRY. La cara exterior de esta hoja ya rotula "REFUGIO MINERO / ENTRADA".
+  _caraPuertaEstanca(puertaPivote, {
+    alto: puertaH, ancho: puertaW, xCara: -0.035, s: -1,
+    sup: 'SALIDA', inf: 'EXIT',
+    mats: { chapa: mAceroIn, marco: mMarco, cromo: mCromo }
+  });
+  // ojo de buey visto desde la mina (la brida de la cara interior la pone `_caraPuertaEstanca`)
   const anilloVentana = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 10, 20), mMarco);
   anilloVentana.rotation.y = Math.PI / 2;
-  anilloVentana.position.set(0.04, puertaH - 0.5, -puertaW / 2);
+  anilloVentana.position.set(0.04, puertaH - 0.42, -puertaW / 2);
   puertaPivote.add(anilloVentana);
   const vidrio = new THREE.Mesh(
     new THREE.CircleGeometry(0.15, 20),
     new THREE.MeshStandardMaterial({ color: 0x0c1a22, roughness: 0.15, metalness: 0.4, transparent: true, opacity: 0.75 })
   );
-  vidrio.rotation.y = -Math.PI / 2;
-  vidrio.position.set(0.045, puertaH - 0.5, -puertaW / 2);
+  vidrio.rotation.y = Math.PI / 2;
+  vidrio.position.set(0.045, puertaH - 0.42, -puertaW / 2);
   puertaPivote.add(vidrio);
   // 3 BISAGRAS en el canto de pivote (foto: lado izquierdo)
   for (const hy of [0.32, 0.98, 1.62]) {
@@ -2561,9 +2734,11 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
 
   // marco + puerta interior estanca (pivote en -Z, como la exterior)
   const marcoInt = new THREE.Mesh(
-    new THREE.BoxGeometry(0.05, puertaH + 0.12, puertaW + 0.12), mMarco
+    _perfilMarcoPuerta(puertaW + 0.12, puertaH + 0.12, puertaW - 0.02, puertaH - 0.02, 0.05),
+    mMarco
   );
-  marcoInt.position.set(xBulk - 0.01, y0 + puertaH / 2, doorZ);
+  marcoInt.rotation.y = Math.PI / 2;
+  marcoInt.position.set(xBulk - 0.035, y0 + puertaH / 2, doorZ);
   S.add(marcoInt);
   const puertaIntPivote = new THREE.Group();
   puertaIntPivote.position.set(xBulk - 0.04, y0, doorZ + puertaW / 2);
@@ -2572,94 +2747,19 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   hojaInt.position.set(0, puertaH / 2, -puertaW / 2);
   hojaInt.castShadow = true;
   puertaIntPivote.add(hojaInt);
-  // (El rótulo "SALIDA / EXIT" NO va aquí: esta hoja comunica la esclusa con la cámara, no con
-  //  el exterior. Está en la cara interior de la PUERTA EXTERIOR, que es por la que se sale.)
-  // ── OJO DE BUEY (foto real): brida blanca atornillada con 12 pernos,
-  //    aro interior de bronce y vidrio oscuro apenas velado por la luz
-  //    de la precámara al otro lado ─────────────────────────────────
-  const yOjo = puertaH - 0.42;
-  const zOjo = -puertaW / 2;
-  const bridaOjo = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.030, 10, 24), mAceroIn);
-  bridaOjo.rotation.y = Math.PI / 2;
-  bridaOjo.position.set(-0.036, yOjo, zOjo);
-  puertaIntPivote.add(bridaOjo);
-  const aroBronce = new THREE.Mesh(new THREE.TorusGeometry(0.128, 0.011, 8, 22),
-    MineMaterials.plano(0x9a7a32, { rough: 0.4, metal: 0.75 }));
-  aroBronce.rotation.y = Math.PI / 2;
-  aroBronce.position.set(-0.038, yOjo, zOjo);
-  puertaIntPivote.add(aroBronce);
-  for (let i = 0; i < 12; i++) {
-    const ang = (i / 12) * Math.PI * 2;
-    const perno = new THREE.Mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 0.016, 8), mCromo);
-    perno.rotation.z = Math.PI / 2;
-    perno.position.set(-0.050, yOjo + Math.sin(ang) * 0.172, zOjo + Math.cos(ang) * 0.172);
-    puertaIntPivote.add(perno);
-  }
-  const vidrioInt = new THREE.Mesh(
-    new THREE.CircleGeometry(0.122, 22),
-    new THREE.MeshStandardMaterial({
-      color: 0x262e2a, emissive: 0x4a4028, emissiveIntensity: 0.22,
-      roughness: 0.5, metalness: 0.08, transparent: true, opacity: 0.96, side: THREE.DoubleSide
-    })
-  );
-  vidrioInt.rotation.y = Math.PI / 2;
-  vidrioInt.position.set(-0.038, yOjo, zOjo);
-  puertaIntPivote.add(vidrioInt);
-
-  // ── TRAVESAÑOS EN RELIEVE de la hoja (foto real: refuerzos que la
-  //    dividen en tres paños, con el marco perimetral) ──────────────
-  for (const ty of [1.11, 0.60]) {
-    const trav = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.035, puertaW - 0.06), mAceroIn);
-    trav.position.set(-0.041, ty, zOjo);
-    puertaIntPivote.add(trav);
-  }
-  for (const [mw, mh, my, mz] of [
-    [puertaW - 0.06, 0.026, puertaH - 0.035, zOjo],
-    [puertaW - 0.06, 0.026, 0.035, zOjo],
-    [0.026, puertaH - 0.09, puertaH / 2, -0.035],
-    [0.026, puertaH - 0.09, puertaH / 2, -puertaW + 0.035]
-  ]) {
-    const marcoRel = new THREE.Mesh(new THREE.BoxGeometry(0.018, mh, mw), mAceroIn);
-    marcoRel.position.set(-0.039, my, mz);
-    puertaIntPivote.add(marcoRel);
-  }
-
-  // ── MANIJA DE PALANCA del lado del cierre (opuesto a las bisagras):
-  //    cubo redondo, brazo horizontal, uñas de enclavamiento y retén ──
-  const yMan = 1.03, zCubo = -puertaW + 0.13;
-  const cuboMan = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.078, 0.058, 20), mAceroIn);
-  cuboMan.rotation.z = Math.PI / 2;
-  cuboMan.position.set(-0.062, yMan, zCubo);
-  cuboMan.castShadow = true;
-  puertaIntPivote.add(cuboMan);
-  // tornillo central del cubo
-  const ejeMan = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.014, 8), mCromo);
-  ejeMan.rotation.z = Math.PI / 2;
-  ejeMan.position.set(-0.094, yMan, zCubo);
-  puertaIntPivote.add(ejeMan);
-  // brazo hacia el canto de bisagras
-  const brazoMan = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.46, 12), mAceroIn);
-  brazoMan.rotation.x = Math.PI / 2;
-  brazoMan.position.set(-0.072, yMan, zCubo + 0.25);
-  brazoMan.castShadow = true;
-  puertaIntPivote.add(brazoMan);
-  const puntaMan = new THREE.Mesh(new THREE.SphereGeometry(0.021, 12, 8), mAceroIn);
-  puntaMan.position.set(-0.072, yMan, zCubo + 0.48);
-  puertaIntPivote.add(puntaMan);
-  // dos uñas colgando del cubo (enganchan los retenes del marco)
-  // cuelgan por DEBAJO del cubo, sin solaparlo (evita el z-fighting). Van en
-  // acero desnudo: pintadas del crema de la hoja se perderían contra ella.
-  for (const [uz, ua] of [[-0.038, 0.22], [0.058, -0.14]]) {
-    const una = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.15, 0.040), mMarco);
-    una.position.set(-0.072, yMan - 0.145, zCubo + uz);
-    una.rotation.x = ua;
-    una.castShadow = true;
-    puertaIntPivote.add(una);
-  }
-  // retén cuadrado atornillado a la hoja, bajo el brazo
-  const retenMan = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.038, 0.04), mMarco);
-  retenMan.position.set(-0.048, yMan - 0.035, zCubo + 0.30);
-  puertaIntPivote.add(retenMan);
+  // ── LAS DOS CARAS de la hoja del mamparo ──
+  //  Cada cara se rotula por DONDE LLEVA, que es como está en el refugio real:
+  //  hacia la ESCLUSA (+X) pone ENTRADA/ENTRY —cruzarla devuelve a la cámara— y hacia la
+  //  CÁMARA (−X) pone SALIDA/EXIT, porque desde dentro ésta es la puerta por la que se sale.
+  const matsPuerta = { chapa: mAceroIn, marco: mMarco, cromo: mCromo };
+  _caraPuertaEstanca(puertaIntPivote, {
+    alto: puertaH, ancho: puertaW, xCara: 0.03, s: 1,
+    sup: 'ENTRADA', inf: 'ENTRY', mats: matsPuerta
+  });
+  _caraPuertaEstanca(puertaIntPivote, {
+    alto: puertaH, ancho: puertaW, xCara: -0.03, s: -1,
+    sup: 'SALIDA', inf: 'EXIT', mats: matsPuerta
+  });
   // 3 bisagras en el canto de pivote (foto: bloques crema)
   for (const hy of [0.32, 0.98, 1.62]) {
     const bisInt = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.09), mAceroIn);
@@ -3268,19 +3368,21 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   bpuLogo.position.set(gabD / 2 + 0.022, 0.31, 0);
   bpu.add(bpuLogo);
 
-  // ── GRUPO de cilindros de O2 BLANCOS (2×2) junto a la BPU, con
-  //    correa naranja y manifold de bronce con mini-manómetros ────────
+  // ── BATERÍA DE CILINDROS DE O2 junto a la BPU, con eslinga de carraca
+  //    y manifold colgado sobre ellos ─────────────────────────────────
   S = sub(g, 'cilindros_o2', 'Cilindros de O2',
-    'Batería 2×2 de cilindros crema con marcas estarcidas y cinta verde, cabezal ' +
-    'de bronce con volante, regulador "OXYGEN" con manómetro bar/psi, flujómetro ' +
-    'de tubo y perilla verde, correa de sujeción y manifold de pared.');
+    'Batería de CUATRO cilindros crema en fila contra el costado, con marcas ' +
+    'estarcidas y cinta verde, cabezal de bronce con volante, regulador "OXYGEN" ' +
+    'con manómetro bar/psi, flujómetro de tubo y perilla verde, eslinga de carraca ' +
+    'y manifold con latiguillos.');
   const o2Blancos = new THREE.Group();
-  o2Blancos.position.set(-1.98, y0 + t, -A / 2 + 0.41);
+  o2Blancos.position.set(-1.98, y0 + t, -0.92);
   S.add(o2Blancos);
-  // DOS cilindros en línea, no cuatro en 2×2: es lo que hay en la foto, y es lo coherente con
-  // el hueco disponible entre la BPU y el costado. Ø 0.23 m × 1.6 m (botella industrial de 50 L).
+  // CUATRO cilindros en una sola fila contra el costado: en 2×2 la pareja trasera quedaba
+  // exactamente detrás de la delantera y desde la sala sólo se leían dos botellas.
+  // Ø 0.23 m × 1.6 m (botella industrial de 50 L), separadas 0.24 m (casi tocándose).
   const O2_ALTO = 1.6, O2_RADIO = 0.115;
-  const posO2 = [[0, -0.125], [0, 0.125]];
+  const posO2 = [[0, -0.36], [0, -0.12], [0, 0.12], [0, 0.36]];
   posO2.forEach(([px, pz], i) => {
     const cil = _cilindroO2(O2_ALTO, O2_RADIO, { seed: i + 1 });
     cil.position.set(px, 0, pz);
@@ -3295,10 +3397,10 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   }
   // ── ESLINGA NARANJA DE CARRACA (D.S. 024: cilindros asegurados) ──────
   //  Una botella de O2 a 200 bar suelta es un proyectil: la eslinga con carraca es obligatoria y
-  //  en la foto es de lo más visible de la escena. Abraza las DOS botellas y tensa contra un
+  //  en la foto es de lo más visible de la escena. Abraza las CUATRO botellas y tensa contra un
   //  cáncamo del mamparo; la carraca queda al frente, donde se aprieta.
   const mCorrea = MineMaterials.plano(0xd86a10, { rough: 0.78, metal: 0.05 });
-  const semiX = O2_RADIO, semiZ = 0.125 + O2_RADIO;   // tangente al par de botellas
+  const semiX = O2_RADIO, semiZ = 0.36 + O2_RADIO;    // tangente a la fila de botellas
   const yCorrea = 1.02;
   for (const cx of [-semiX, semiX]) {                 // los dos ramales, delante y detrás
     const tramo = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.055, 2 * semiZ), mCorrea);
@@ -3332,27 +3434,30 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   // ── Manifold de pared: dos tubos horizontales con abrazaderas y las
   //    latiguillos de cada cabezal subiendo hasta ellos (foto real) ──
   const mTuboO2 = MineMaterials.plano(0xa8a49a, { rough: 0.32, metal: 0.78 });
-  for (const [ty, tz] of [[2.24, -0.33], [2.16, -0.33]]) {
-    const tuboO2 = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.92, 12), mTuboO2);
-    tuboO2.rotation.z = Math.PI / 2;
-    tuboO2.position.set(0, ty, tz);
+  //  Corre PARALELO a la fila (eje Z) para que cada botella tenga su toma justo encima; como
+  //  ahí no hay pared a la que amarrarlo, cuelga de la bóveda con dos tirantes.
+  for (const ty of [2.24, 2.16]) {
+    const tuboO2 = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 1.12, 12), mTuboO2);
+    tuboO2.rotation.x = Math.PI / 2;
+    tuboO2.position.set(-0.20, ty, 0);
     o2Blancos.add(tuboO2);
   }
-  for (const bx of [-0.34, 0.16]) {
-    const abraz = new THREE.Mesh(
-      new THREE.BoxGeometry(0.035, 0.15, 0.05),
-      MineMaterials.plano(0x77746c, { rough: 0.5, metal: 0.55 })
-    );
-    abraz.position.set(bx, 2.20, -0.35);
+  const mAbraz = MineMaterials.plano(0x77746c, { rough: 0.5, metal: 0.55 });
+  for (const bz of [-0.42, 0.34]) {
+    const abraz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.15, 0.035), mAbraz);
+    abraz.position.set(-0.22, 2.20, bz);
     o2Blancos.add(abraz);
+    const tirante = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.010, 0.26, 8), mAbraz);
+    tirante.position.set(-0.22, 2.41, bz);
+    o2Blancos.add(tirante);
   }
   const mLatiguillo = MineMaterials.plano(0x8e8b82, { rough: 0.35, metal: 0.7 });
   for (const [px, pz] of posO2) {
     const curva = new THREE.CatmullRomCurve3([
       new THREE.Vector3(px + 0.118, yCabezal + 0.20, pz + 0.072),
-      new THREE.Vector3(px + 0.09, yCabezal + 0.30, pz + 0.02),
-      new THREE.Vector3(px + 0.02, yCabezal + 0.38, pz - 0.14),
-      new THREE.Vector3(px, 2.16, -0.31)
+      new THREE.Vector3(px + 0.08, yCabezal + 0.31, pz + 0.05),
+      new THREE.Vector3(px - 0.08, yCabezal + 0.40, pz + 0.01),
+      new THREE.Vector3(px - 0.20, 2.16, pz)
     ]);
     o2Blancos.add(new THREE.Mesh(new THREE.TubeGeometry(curva, 20, 0.010, 6, false), mLatiguillo));
   }
@@ -4077,10 +4182,18 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   }
 
   // ── Placas de señalética + flechas rojas en las paredes ──────────
-  S = sub(g, 'senaletica_interior', 'Señalética interior',
-    'Estaciones de consumibles: tira rotulada, flecha roja de ubicación y placa ' +
-    'instructiva (raciones alimenticias y de agua), más pósters de plano de mina.');
-
+  //
+  // UN SUBELEMENTO POR LETRERO. Antes los 17 planos colgaban de un único `senaletica_interior`,
+  // y eso hacía que en el recorrido guiado NO SE LEYERA NINGUNO por dos motivos a la vez:
+  //   1. el paso encuadra la CAJA ENVOLVENTE del subelemento, y esa caja iba de hastial a
+  //      hastial ⇒ la cámara se alejaba ~4 m y los rótulos quedaban del tamaño de un píxel;
+  //   2. los letreros son planos de UNA SOLA CARA pegados a la pared mirando hacia ADENTRO, así
+  //      que los de la pared opuesta a la cámara se veían por detrás y los descartaba el
+  //      backface culling — literalmente no aparecían.
+  // Separados, cada letrero recibe su propio encuadre desde el lado que lo hace legible (ver el
+  // guion del recorrido arriba: los de la pared +Z se miran con yaw negativo y los de la −Z con
+  // yaw positivo) y además se puede aislar desde la lista del visor y por doble clic.
+  //
   // Cada PANEL de pared entre costillas lleva una estación de consumibles con
   // el mismo lenguaje de las fotos: tira blanca rotulada arriba, flecha roja
   // señalando el pañol de abajo y, cuando corresponde, la placa instructiva.
@@ -4115,21 +4228,60 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   );
 
   // sz: pared (+1 = costado del logo, -1 = costado de la puerta de acceso)
+  // id/nombre/desc: cada estación es su PROPIO subelemento (ver nota de arriba).
   const ESTACIONES = [
-    { sz:  1, x: -2.10, texto: 'TANQUE DE MONOXIDO' },
-    { sz:  1, x: -1.30, texto: 'CATALIZADOR DE CO' },
-    { sz:  1, x: -0.15, texto: 'RACIONES ALIMENTICIAS', tab: '#1c4fa8', placa: INSTRUCTIVO_ALIMENTOS },
-    { sz:  1, x:  1.15, texto: 'RACIONES DE AGUA',                      placa: INSTRUCTIVO_AGUA },
+    {
+      sz: 1, x: -2.10, texto: 'TANQUE DE MONOXIDO',
+      id: 'letrero_tanque_co', nombre: 'Letrero — tanque de monóxido',
+      desc: 'Tira rotulada y flecha roja que señalan el pañol del tanque de monóxido bajo la ' +
+            'banca. Cada consumible del refugio se rotula en su panel: con 20 personas dentro ' +
+            'nadie debe ponerse a abrir cajones a ciegas para encontrarlo.'
+    },
+    {
+      sz: 1, x: -1.30, texto: 'CATALIZADOR DE CO',
+      id: 'letrero_catalizador_co', nombre: 'Letrero — catalizador de CO',
+      desc: 'Rotulación del catalizador de monóxido, que transforma el CO en CO2 para que la ' +
+            'cal sodada de la BPU pueda retirarlo. Es el consumible crítico tras un incendio, ' +
+            'que es precisamente cuando el refugio se ocupa.'
+    },
+    {
+      sz: 1, x: -0.15, texto: 'RACIONES ALIMENTICIAS', tab: '#1c4fa8', placa: INSTRUCTIVO_ALIMENTOS,
+      id: 'letrero_raciones_alimentos', nombre: 'Instructivo — raciones alimenticias',
+      desc: 'Tira, flecha de ubicación y placa instructiva de las raciones de emergencia: ' +
+            'paquetes de 18 barras de 38 g, entre 4 y 8 barras diarias por persona (800 a ' +
+            '1600 Kcal), con la verificación de sellado al vacío y fecha de vencimiento.'
+    },
+    {
+      sz: 1, x: 1.15, texto: 'RACIONES DE AGUA', placa: INSTRUCTIVO_AGUA,
+      id: 'letrero_raciones_agua', nombre: 'Instructivo — raciones de agua',
+      desc: 'La misma estación para el agua potable de emergencia: sobres de 125 ml, entre 2 y ' +
+            '4 sobres diarios por persona (250 a 500 ml), con idéntica verificación de sellado ' +
+            'y vencimiento antes de consumir.'
+    },
     // en la pared -Z los dos primeros paneles los ocupan los cilindros de O2
     // (x≈-2.10) y su cartel de procedimiento (x≈-1.30)
-    { sz: -1, x: -0.15, texto: 'DIAGRAMA DE AGUA' },
-    { sz: -1, x:  1.15, texto: 'PROCEDIMIENTO DE INGRESO' }
+    {
+      sz: -1, x: -0.15, texto: 'DIAGRAMA DE AGUA',
+      id: 'letrero_diagrama_agua', nombre: 'Letrero — diagrama de agua',
+      desc: 'Rotulación del diagrama de la línea de agua en la pared del acceso: de dónde viene ' +
+            'el agua del refugio y qué válvula la corta.'
+    },
+    {
+      sz: -1, x: 1.15, texto: 'PROCEDIMIENTO DE INGRESO',
+      id: 'letrero_procedimiento_ingreso', nombre: 'Letrero — procedimiento de ingreso',
+      desc: 'Rotulación del procedimiento de ingreso, a la vista de quien acaba de cruzar la ' +
+            'esclusa: recuerda que las dos puertas estancas nunca pueden quedar abiertas a la vez.'
+    }
   ];
+  // Material COMPARTIDO por las seis flechas. El recorrido guiado clona los materiales por
+  // BUCKET (subelemento) además de por material, así que compartirlo entre los seis letreros no
+  // impide atenuar cada uno por separado.
   const flechaMat = new THREE.MeshStandardMaterial({
     map: _aTextura(_texturaFlecha()), transparent: true, roughness: 0.7
   });
   const H_TIRA = 0.072;                       // alto de la tira rotulada
   for (const e of ESTACIONES) {
+    S = sub(g, e.id, e.nombre, e.desc);
     const zPared = e.sz * (A / 2 - t - 0.012);
     const rotPared = e.sz > 0 ? Math.PI : 0;
     // en la pared +Z la derecha de pantalla es -X: refleja los desplazamientos
@@ -4159,8 +4311,24 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     placa.rotation.y = rotPared;
     S.add(placa);
   }
-  // pósters de plano/mapa a color junto a la puerta (fotos reales, pared -Z)
-  for (let i = 0; i < 2; i++) {
+  // pósters de plano/mapa a color junto a la puerta (fotos reales, pared -Z).
+  // Son DOS planos distintos y se leen por separado, así que cada uno es su propio subelemento.
+  const PLANOS = [
+    {
+      id: 'plano_rescate_nivel', nombre: 'Plano — esquema de rescate NV-1600',
+      desc: 'Póster a color de la red de galerías del nivel con el punto ROJO de "usted está ' +
+            'aquí". Es el plano sobre el que se acuerda la ruta de salida con el equipo de ' +
+            'rescate por la línea de vida.'
+    },
+    {
+      id: 'plano_ubicacion_refugios', nombre: 'Plano — ubicación de refugios',
+      desc: 'Segundo póster: dónde está cada refugio del nivel. Sirve para decidir a cuál ' +
+            'dirigirse si el rescate indica evacuar éste, o para ubicar a la cuadrilla que ' +
+            'no llegó.'
+    }
+  ];
+  for (let i = 0; i < PLANOS.length; i++) {
+    S = sub(g, PLANOS[i].id, PLANOS[i].nombre, PLANOS[i].desc);
     const mapa = new THREE.Mesh(
       new THREE.PlaneGeometry(0.44, 0.33),
       new THREE.MeshStandardMaterial({ map: _aTextura(_texturaMapa(i + 1)), roughness: 0.75 })
@@ -4171,6 +4339,10 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
 
   // ── Cartel "PROCEDIMIENTO PARA SUMINISTRO DE OXÍGENO" junto a la
   //    batería de cilindros, a la altura de lectura del operador ──────
+  S = sub(g, 'letrero_procedimiento_o2', 'Cartel — procedimiento de suministro de O2',
+    'Cartel enmarcado junto a la batería de cilindros, a la altura de lectura del operador: en ' +
+    'qué orden se abren las válvulas y qué caudal corresponde según el número de ocupantes. Es ' +
+    'el único paso del refugio que se ejecuta a mano y hay que hacerlo bien a la primera.');
   const lienzoProcO2 = _texturaProcedimientoO2();
   const anchoProcO2 = 0.62;
   const procO2 = new THREE.Mesh(

@@ -183,7 +183,7 @@ visor se pueda **listar, aislar y editar cada parte de forma independiente**.
 
 | Elemento             | Subelementos esperados (ids)                                                        | Archivo                              |
 |----------------------|--------------------------------------------------------------------------------------|--------------------------------------|
-| Refugio Dräger       | skid, casco, franjas_logos, puerta_exterior, semaforo, senaletica_frontal, extintor_frontal, precamara, iluminacion_interior, asientos, acabados_interiores, bpu, cilindros_o2, banco_baterias, instrumentacion, tuberia, senaletica_interior | `src/elementos/ssoma/refugio_draeger.js` |
+| Refugio Dräger       | skid, casco, franjas_logos, puerta_exterior, semaforo, senaletica_frontal, extintor_frontal, precamara, iluminacion_interior, asientos, acabados_interiores, bpu, cilindros_o2, banco_baterias, instrumentacion, tuberia, letrero_tanque_co, letrero_catalizador_co, letrero_raciones_alimentos, letrero_raciones_agua, letrero_diagrama_agua, letrero_procedimiento_ingreso, plano_rescate_nivel, plano_ubicacion_refugios, letrero_procedimiento_o2 | `src/elementos/ssoma/refugio_draeger.js` |
 | Refugio simple       | cuerpo, puerta, semaforo, letrero, extintor                                          | `src/elementos/ssoma/refugio.js`           |
 | Nicho del refugio    | excavacion, suelo, marco_apertura, refugio_draeger (anidado), cordel_letreros, senaletica, cables, iluminacion | `src/elementos/ssoma/nicho_refugio.js` |
 | Camioneta Hilux      | chasis, capot, bull_bar, cabina, franja_neon, reflectivos, tolva, luces, baliza, placa, ruedas, extintor | `src/elementos/equipos/camioneta.js` |
