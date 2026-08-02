@@ -19,7 +19,8 @@
     "test:player": "node scripts/verify-player-recovery.mjs",
     "test:nichos": "node scripts/verify-niche-clearance.mjs",
     "test:trafico": "node scripts/verify-traffic-clearance.mjs",
-    "test:letreros": "node scripts/verify-tour-signage.mjs"
+    "test:letreros": "node scripts/verify-tour-signage.mjs",
+    "test:refugio": "node scripts/verify-refugio-manual.mjs"
   },
   "keywords": [
     "threejs",

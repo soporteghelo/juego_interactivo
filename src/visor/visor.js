@@ -492,17 +492,18 @@ renderer.domElement.addEventListener('dblclick', (ev) => {
   if (idx < 0) idx = capas.length > 1 ? 1 : 0;      // todo fantasma: se mira A TRAVÉS
 
   const grupo = capas[idx].grupo;
-  if (tour.activo && grupo !== tour.grupoActual) {
-    // Primer doble clic sobre una pieza: saltar a su paso y quedarse ahí.
-    const i = tour.indiceDe(grupo);
-    if (i < 0) return;                              // pieza fuera del guion
-    tour.irA(i);
+  const iPaso = tour.activo ? tour.indiceDe(grupo) : -1;
+  if (iPaso >= 0 && grupo !== tour.grupoActual) {
+    // Primer doble clic sobre una pieza del guion: saltar a su paso y quedarse ahí.
+    tour.irA(iPaso);
     tour.pausar(true);                              // se pidió verla: no seguir solo
     tourPlay.textContent = '▶';
   } else {
-    // Fuera del recorrido, o SEGUNDO doble clic sobre la pieza ya enfocada:
-    // se sale de la vista guiada y la pieza queda aislada para inspeccionarla
-    // con libertad (`seleccionarSub` ya cierra el recorrido por su cuenta).
+    // Fuera del recorrido, SEGUNDO doble clic sobre la pieza ya enfocada, o pieza
+    // que el guion no recorre: se sale de la vista guiada y la pieza queda aislada
+    // para inspeccionarla con libertad (`seleccionarSub` cierra el recorrido por su
+    // cuenta). El guion presenta una SELECCIÓN de partes, pero todas las del
+    // elemento deben poder consultarse a mano.
     seleccionarSub(grupo.userData.subelemento.id);
   }
 });

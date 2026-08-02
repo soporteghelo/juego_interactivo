@@ -59,14 +59,18 @@ const LETREROS = [
   'plano_rescate_nivel', 'plano_ubicacion_refugios',
   'letrero_procedimiento_o2'
 ];
+// Lo EXIGIBLE es que cada letrero sea un subelemento propio: así se aísla desde la lista del
+// visor y por doble clic, que es lo que significa "verse de forma independiente". QUÉ letreros
+// entran además en el recorrido guiado es una decisión editorial del guion —está curado a mano
+// y se acorta a conveniencia—, así que aquí no se impone: solo se comprueban los que sí están.
 for (const id of LETREROS) {
   assert.ok(porId.has(id), `Falta el subelemento del letrero ${id}`);
-  const paso = recorrido.pasos.find(p => p.sub === id);
-  assert.ok(paso, `El letrero ${id} no tiene paso propio en el recorrido`);
-  // Se eligió heredar la ficha del subelemento: el paso no debe traer texto propio.
-  assert.equal(paso.texto, undefined, `${id}: el paso duplica el texto del subelemento`);
   const meta = porId.get(id).userData.subelemento;
-  assert.ok(meta.descripcion?.length > 40, `${id}: la descripción heredada es demasiado corta`);
+  assert.ok(meta.descripcion?.length > 40, `${id}: la ficha del subelemento es demasiado corta`);
+  const paso = recorrido.pasos.find(p => p.sub === id);
+  if (!paso) continue;                       // no está en el guion: es válido
+  // Los que sí están heredan la ficha del subelemento: el paso no duplica el texto.
+  assert.equal(paso.texto, undefined, `${id}: el paso duplica el texto del subelemento`);
 }
 
 // ── Mismas constantes que RecorridoGuiado / el visor ──────────────────────────
@@ -108,7 +112,6 @@ const informe = [];
 for (const id of LETREROS) {
   const grupo = porId.get(id);
   const paso = recorrido.pasos.find(p => p.sub === id);
-  const { centro, pos, d } = encuadre(grupo, paso);
 
   const planos = [];
   grupo.traverse(o => { if (o.isMesh) planos.push(o); });
@@ -121,6 +124,12 @@ for (const id of LETREROS) {
     assert.ok(n.dot(normales[0]) > 0.99,
       `${id}: agrupa rótulos de paredes opuestas, ningún encuadre puede mostrarlos a la vez`);
   }
+
+  // Los letreros que el guion NO recorre ya han pasado lo exigible (subelemento propio con su
+  // ficha, y rótulos coherentes). El resto de comprobaciones son sobre el ENCUADRE del paso,
+  // así que solo aplican a los que están en el recorrido.
+  if (!paso) continue;
+  const { centro, pos, d } = encuadre(grupo, paso);
 
   // 4. LA CÁMARA VE LA CARA ESCRITA. Éste es el fallo que se corrige: con la cámara del lado
   //    contrario el plano se descarta por backface culling y el letrero no aparece.
@@ -148,6 +157,7 @@ for (const id of LETREROS) {
 console.log(JSON.stringify({
   pasosDelRecorrido: recorrido.pasos.length,
   letrerosIndependientes: LETREROS.length,
+  letrerosEnElGuion: informe.length,
   distanciaMaxima: +Math.max(...informe.map(l => l.distanciaCamara)).toFixed(2),
   desvioMaximo: +Math.max(...informe.map(l => l.desvioNormal)).toFixed(1),
   letreros: informe

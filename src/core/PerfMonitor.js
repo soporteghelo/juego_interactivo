@@ -63,6 +63,31 @@ export class PerfMonitor {
     const idx = ORDEN.indexOf(Settings.qualityKey);
     if (idx === -1) return;
 
+    // ESCALON DE RESOLUCION. Al llegar a 'bajo' ya no quedan sombras ni postprocesado que
+    // apagar: antes el monitor se quedaba sin margen y el juego se estancaba ahi. Rasterizar
+    // menos pixeles es lo unico que sigue dando FPS, y ademas es barato — cambiar el pixelRatio
+    // no recompila shaders, asi que puede moverse en pasos pequeños y sin la pereza que exige
+    // la escalera de presets.
+    if (idx === ORDEN.length - 1) {
+      if (fps < this.targetFps - 7) {
+        if (++this._bajadasSeguidas >= 2 && Settings.setResolutionScale(Settings.resolutionScale - 0.1)) {
+          this._bajadasSeguidas = 0;
+          this.bus?.emit('perf:quality', { key: Settings.qualityKey, fps: Math.round(fps), dir: 'down', escala: Settings.resolutionScale });
+        }
+        this._subidasSeguidas = 0;
+        return;
+      }
+      // Recupera nitidez ANTES de intentar subir de preset: es el cambio menos disruptivo.
+      if (fps > this.targetFps + 20 && Settings.resolutionScale < 1) {
+        if (++this._subidasSeguidas >= 3 && Settings.setResolutionScale(Settings.resolutionScale + 0.1)) {
+          this._subidasSeguidas = 0;
+          this.bus?.emit('perf:quality', { key: Settings.qualityKey, fps: Math.round(fps), dir: 'up', escala: Settings.resolutionScale });
+        }
+        this._bajadasSeguidas = 0;
+        return;
+      }
+    }
+
     if (fps < this.targetFps - 7 && idx < ORDEN.length - 1) {
       // Rendimiento insuficiente. Bajar cuesta una recompilacion completa de shaders, asi que
       // se exige que la caida se repita en DOS ventanas seguidas (~4 s) antes de tocar nada.

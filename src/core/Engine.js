@@ -31,6 +31,8 @@ import { VaporSystem } from '../particles/VaporSystem.js';
 import { DripSystem } from '../particles/DripSystem.js';
 import { WorkSiteSystem } from '../world/WorkSiteSystem.js';
 import { WorkCrewSystem } from '../world/WorkCrewSystem.js';
+import { ActoresLod } from '../world/ActoresLod.js';
+import { construirCarcasa } from '../procedural/CarcasaFusionada.js';
 import { AudioManager } from '../audio/AudioManager.js';
 import { HUD } from '../ui/HUD.js';
 import { Minimap } from '../ui/Minimap.js';
@@ -297,10 +299,16 @@ export class Engine {
 
     // Labores VIVAS: sonido sintetizado (percusion/hiss/bomba) + polvo/spray por distancia.
     this.workFX = new WorkFX({ scene: this.scene });
+    // LOD de actores pesados: equipos aparcados y personas. Es lo único caro que no pasa ni por
+    // el streaming de tramos ni por la fusión de estáticos (ver ActoresLod.js).
+    this.actoresLod = new ActoresLod({ bus: this.bus, construirCarcasa });
+    const nEquipos = this.actoresLod.registrarEquiposDeMundo(this.world.segments);
+    if (nEquipos) console.info(`[Mina] LOD de equipos aparcados: ${nEquipos} máquinas`);
+
     this.workSites = new WorkSiteSystem({ world: this.world, bus: this.bus, audio: this.audio, fx: this.workFX });
     // Cuadrillas HUMANAS en las labores activas (perforista, sostenimiento, boquillero, vigia):
     // se crean/retiran por proximidad. Complementa a workSites (que anima solo las maquinas).
-    this.workCrews = new WorkCrewSystem({ world: this.world, bus: this.bus, scene: this.scene });
+    this.workCrews = new WorkCrewSystem({ world: this.world, bus: this.bus, scene: this.scene, lod: this.actoresLod });
     // Flujo de ventilacion VISIBLE: penacho de aire en la boca de la manga mas cercana.
     this.ventFlow = new VentFlowSystem({ scene: this.scene, world: this.world, settings: Settings, bus: this.bus });
     // Vaho/condensacion en las labores calurosas (frente/shotcrete/bombeo).
@@ -323,7 +331,7 @@ export class Engine {
     }
 
     // --- Stubs extensibles (cableados al bus, listos para crecer) ---
-    this.npcs = new NPCManager({ scene: this.scene, bus: this.bus, world: this.world });
+    this.npcs = new NPCManager({ scene: this.scene, bus: this.bus, world: this.world, lod: this.actoresLod });
     // Conectar NPCs con vehiculos (claxon + evasion + muerte por atropello)
     this.vehicleSystem.setNpcs(this.npcs.npcs);
     this.eventDirector = new EventDirector({ bus: this.bus, world: this.world, lighting: this.lighting });
@@ -352,6 +360,7 @@ export class Engine {
     this.loop.add(this.hazardSystem);
     this.loop.add(this.dust);
     this.loop.add(this.mist);
+    this.loop.add(this.actoresLod);  // LOD/culling de equipos aparcados y personas
     this.loop.add(this.workSites);   // elige emisores de labor por distancia
     this.loop.add(this.workCrews);   // cuadrillas humanas en las labores (spawn por proximidad)
     this.loop.add(this.workFX);      // integra las particulas de las labores

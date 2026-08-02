@@ -141,6 +141,12 @@ class SettingsState {
     // pensada como VISOR: solo muestra un tramo a la vez) y `?mapa=linear` (corredor lineal antiguo).
     // La mina CSV 3D completa se explora mejor desde "VER MINA COMPLETA 3D" (mina-completa.html).
     this.worldMode = this._readWorldMode();
+    // ESCALA DE RESOLUCION (0.6..1.0): multiplica al `pixelRatioCap` del preset. Es el escalon
+    // que HAY DEBAJO del preset mas bajo — cuando ya no quedan sombras ni postprocesado que
+    // apagar, lo unico que sigue dando FPS es rasterizar menos pixeles. Se separa del preset a
+    // proposito: cambiar el pixelRatio NO recompila shaders (a diferencia de conmutar sombras o
+    // postprocesado), asi que puede reaccionar rapido y en pasos pequeños sin congelar el juego.
+    this.resolutionScale = 1.0;
     this.audioEnabled = true;
     // Luminosidad de la mina: multiplicador aplicado a todas las luces de galeria
     // (PointLight/AmbientLight/HemiLight). NO afecta materiales emisivos (LEDs, cintas).
@@ -185,6 +191,18 @@ class SettingsState {
 
   setControlScheme(scheme) {
     this.controlScheme = scheme;
+  }
+
+  /**
+   * Fija la escala de resolucion (se acota a 0.6–1.0) y avisa al Renderer.
+   * @returns {boolean} true si el valor cambio de verdad (evita reajustes inutiles del canvas).
+   */
+  setResolutionScale(v) {
+    const nuevo = Math.max(0.6, Math.min(1, Math.round(v * 100) / 100));
+    if (nuevo === this.resolutionScale) return false;
+    this.resolutionScale = nuevo;
+    this._emit();
+    return true;
   }
 
   /** Fija el nivel de condiciones inseguras ('bajo'|'medio'|'alto'|'extremo'). */

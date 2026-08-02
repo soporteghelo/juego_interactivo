@@ -13,10 +13,14 @@ import { Device } from '../core/Device.js';
  * Extension point: navegación por waypoints/navmesh, diálogos, tareas de misión.
  */
 export class NPCManager {
-  constructor({ scene, bus, world }) {
+  constructor({ scene, bus, world, lod = null }) {
     this.scene = scene;
     this.bus = bus;
     this.world = world;
+    // LOD de actores pesados: oculta al NPC cuando queda detrás de la niebla negra. Cada
+    // minero FBX son 49.112 triangulos, asi que dibujar uno invisible es el gasto mas caro
+    // del frame (ver ActoresLod.js).
+    this.lod = lod;
     this.npcs = [];
 
     // boundsCheck del mundo (grid): mantiene a los NPC dentro del gálibo transitable.
@@ -101,6 +105,7 @@ export class NPCManager {
         laneTarget: enBerma ? 0 : undefined
       });
       this.scene.add(npc.object);
+      this.lod?.registrarPersona(npc.object);
       this.npcs.push(npc);
       placed++;
     }

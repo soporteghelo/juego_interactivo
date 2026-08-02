@@ -189,6 +189,11 @@ export class NPC {
       this._body.setNextKinematicTranslation({ x: p.x, y: p.y + 0.9, z: p.z });
     }
 
+    // Si `ActoresLod` lo dio por OCULTO (detrás de la niebla negra), no se le toca el esqueleto:
+    // recalcular huesos y reubicar el EPP de alguien a quien nadie ve es puro gasto de CPU. Al
+    // volver a entrar en rango retoma la animación desde la pose en que se quedó.
+    if (this.object.userData._lodEstado === 'lejos') return;
+
     // La ANIMACIÓN de esqueleto es cara (mixer + reubicar ~19 piezas de EPP por hueso):
     // a plena tasa de cerca; acumulada y a saltos cuando el NPC está lejos.
     if (dist > this._animFar) {

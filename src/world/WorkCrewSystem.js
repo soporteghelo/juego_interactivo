@@ -81,8 +81,11 @@ const SPAWN_DIST   = 46;   // m: aparece la cuadrilla al acercarse (antes de ent
 const DESPAWN_DIST = 62;   // m: se retira al alejarse (histeresis para no titilar)
 
 export class WorkCrewSystem {
-  constructor({ world, bus, scene }) {
+  constructor({ world, bus, scene, lod = null }) {
     this.scene = scene;
+    // LOD de actores pesados (ver ActoresLod.js): la cuadrilla se oculta cuando queda detras
+    // de la niebla, y pierde el EPP procedural a media distancia.
+    this.lod = lod;
     this._boundsCheck = typeof world.boundsCheck === 'function' ? world.boundsCheck.bind(world) : null;
     this._blockedCheck = typeof world.blockedByProp === 'function' ? world.blockedByProp.bind(world) : null;
     this._physics = world.physics || null;
@@ -164,12 +167,13 @@ export class WorkCrewSystem {
         physics: this._physics
       });
       this.scene.add(npc.object);
+      this.lod?.registrarPersona(npc.object);
       site.npcs.push(npc);
     }
   }
 
   _despawn(site) {
-    for (const npc of site.npcs) { npc.dispose?.(); this.scene.remove(npc.object); }
+    for (const npc of site.npcs) { this.lod?.olvidar(npc.object); npc.dispose?.(); this.scene.remove(npc.object); }
     site.npcs = null;
     if (site._rocks) { for (const r of site._rocks) this.scene.remove(r.mesh); site._rocks = null; }
   }

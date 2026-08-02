@@ -17,17 +17,19 @@ import { sub } from '../_comun/subelemento.js';
  *  INTERIOR ─ Anatomía según diagrama Dräger (5 zonas):
  *   1. PRECÁMARA (esclusa): área de transición tras la puerta exterior, separada de
  *      la cámara principal por un mamparo con segunda puerta estanca (ojo de buey).
- *   2. BPU "Dräger | SIMSA": unidad azul que purifica el aire — pantalla, paro de
- *      emergencia rojo y botón verde.
+ *   2. UnidadREFUGE® "Dräger | SIMSA": central purificadora azul — pantalla, paro de
+ *      emergencia rojo y botón verde. Recircula el aire por cal sodada Drägersorb® 400
+ *      (CO2), ChamberCatalysis® (CO) y sílice gel (humedad), un ventilador por contenedor.
  *   3. BANCO DE BATERÍAS: estantería al fondo con cajas de baterías (energía
  *      ininterrumpida para iluminación y A/C).
- *   4. CILINDROS DE O2: blancos (correa naranja), azules Dräger junto a la BPU y
- *      negros de alta presión junto al mamparo de la esclusa.
+ *   4. CILINDROS DE O2: blancos (correa naranja), azules Dräger junto a la unidad y
+ *      negros de alta presión junto al mamparo de la esclusa. Un refugio de 20 personas
+ *      lleva TRES cilindros para 48 h (los de 8-12 personas, dos).
  *   5. ASIENTOS Y ALMACENAMIENTO: bancas-cajón con cojín y respaldo acolchado.
  *   + Techo abovedado con LED lineal, split A/C, manómetros, tubería y señalética.
  *
  *  Convención de ejes LOCAL (antes de colocar en escena):
- *    +X = largo (frente/puerta en +X, BPU al fondo en -X)
+ *    +X = largo (frente/puerta en +X, UnidadREFUGE® al fondo en -X)
  *    +Z = ancho (costado del logo Dräger en +Z)
  *     Y = altura
  *
@@ -36,11 +38,12 @@ import { sub } from '../_comun/subelemento.js';
 
 export const meta = {
   id: 'refugio_draeger',
-  nombre: 'Refugio minero Dräger (20 personas)',
+  nombre: 'Refugio minero Dräger ChamberREF® (20 personas)',
   descripcion:
-    'Cámara de rescate Dräger|SIMSA, cap. 20. Exterior con franjas reflectivas, ' +
-    'semáforo y puerta estanca; interior con precámara (esclusa), BPU, banco de ' +
-    'baterías, cilindros de O2, bancas con respaldo, A/C y señalética. Interactuable.'
+    'Estación de refugio móvil ChamberREF® de DOBLE CÁMARA (Dräger|SIMSA), cap. 20 personas. ' +
+    'Exterior con franjas reflectivas, panel de iluminación frontal y puerta estanca; interior ' +
+    'con precámara (esclusa), UnidadREFUGE®, banco de baterías, cilindros de O2, bancas con ' +
+    'respaldo, A/C y señalética. Interactuable.'
 };
 
 /**
@@ -50,7 +53,7 @@ export const meta = {
  * vista, el resto se atenúa como radiografía y la cámara vuela hasta encuadrarla.
  * El orden sigue la secuencia real de uso: se llega al refugio, se reconoce por
  * fuera, se entra por la esclusa, se activan los sistemas de vida y, al final, se
- * revisa la habitabilidad para las 36 h de autonomía.
+ * revisa la habitabilidad para las 48 h de autonomía.
  *
  * Cada paso:
  *   sub    id del subelemento (`sub(g, id, …)`); `null` = vista general del conjunto
@@ -66,12 +69,12 @@ export const recorrido = {
   pasos: [
     {
       sub: null, yaw: 34, pitch: 16, dist: 1.05, dur: 7,
-      titulo: 'Cámara de rescate Dräger | SIMSA',
+      titulo: 'ChamberREF® — estación de refugio Dräger | SIMSA',
       texto:
-        'Refugio minero presurizado para 20 personas y 36 horas de autonomía. Es el ' +
-        'punto de reunión obligatorio ante incendio, irrupción de gases o colapso de la ' +
-        'ventilación. Recorreremos su anatomía: primero el exterior, luego la esclusa y ' +
-        'finalmente los sistemas que mantienen la vida dentro.'
+        'Estación de refugio móvil de DOBLE CÁMARA para 20 personas, dimensionada para 48 h de ' +
+        'autonomía y protección de hasta 96 h. Es el punto de reunión obligatorio ante incendio, ' +
+        'irrupción de gases o colapso de la ventilación. Recorreremos su anatomía: primero el ' +
+        'exterior, luego la esclusa y finalmente los sistemas que mantienen la vida dentro.'
     },
     {
       sub: 'skid', yaw: 48, pitch: 7, dist: 0.95, dur: 5,
@@ -90,47 +93,16 @@ export const recorrido = {
         'estancas sostienen la SOBREPRESIÓN interior que impide que entren gases.'
     },
     {
-      sub: 'franjas_logos', yaw: 92, pitch: 9, dist: 1.0, dur: 5,
-      titulo: '3 · Franjas reflectivas y logos',
-      texto:
-        'Cinta reflectiva naranja/blanco en zócalo y esquinas. En una labor con humo o ' +
-        'sin energía, el reflejo de la lámpara de casco es lo primero que se ve: marca la ' +
-        'silueta del refugio a distancia.'
-    },
-    {
-      sub: 'puerta_exterior', yaw: 12, pitch: 4, dist: 0.85, dur: 7,
-      titulo: '4 · Puerta estanca exterior',
-      texto:
-        'Hoja con ojo de buey y palancas de cierre sobre marco con sello de junta. ' +
-        'Rotulada "REFUGIO MINERO — ENTRADA / ENTRY" y con la capacidad (20). Es la ' +
-        'primera de las DOS puertas: nunca deben quedar ambas abiertas a la vez.'
-    },
-    {
       sub: 'semaforo', yaw: 24, pitch: 12, dist: 1.55, dur: 6,
-      titulo: '5 · Semáforo de estado',
+      titulo: '3 · Semáforo de estado',
       texto:
         'Columna de luces visible desde la galería. VERDE fija: el refugio está ' +
         'alimentado por la red eléctrica de mina. ROJA fija: está corriendo con sus ' +
         'propias baterías. ÁMBAR intermitente: baliza de localización, siempre activa.'
     },
     {
-      sub: 'senaletica_frontal', yaw: 26, pitch: 5, dist: 1.25, dur: 6,
-      titulo: '6 · Señalética frontal',
-      texto:
-        'Placa con el número de refugio, instrucciones de ingreso y porta-documentos con ' +
-        'el procedimiento de emergencia y los planos de escape del nivel. Se lee ANTES ' +
-        'de abrir, sin quitarse los guantes.'
-    },
-    {
-      sub: 'extintor_frontal', yaw: 42, pitch: 2, dist: 1.7, dur: 4.5,
-      titulo: '7 · Extintor exterior',
-      texto:
-        'Extintor PQS montado en el frente, fuera de la cámara. Permite atacar un amago ' +
-        'de fuego en la galería sin contaminar la atmósfera interior del refugio.'
-    },
-    {
       sub: 'precamara', yaw: 24, pitch: 8, dist: 0.95, dur: 7,
-      titulo: '8 · Precámara (esclusa)',
+      titulo: '4 · Precámara (esclusa)',
       texto:
         'Área de transición entre las dos puertas estancas. Se entra, se CIERRA la puerta ' +
         'exterior y recién entonces se abre la interior: la esclusa purga el aire ' +
@@ -138,111 +110,68 @@ export const recorrido = {
     },
     {
       sub: 'bpu', yaw: -38, pitch: 8, dist: 1.0, dur: 8,
-      titulo: '9 · BPU — unidad de protección respiratoria',
+      titulo: '5 · UnidadREFUGE® — central purificadora de aire',
       texto:
-        'El corazón del refugio. La Breathing Protection Unit Dräger | SIMSA hace ' +
-        'recircular el aire: absorbe el CO2 con cal sodada, dosifica oxígeno y mantiene la ' +
-        'sobrepresión. Su panel muestra O2, CO2, CO y presión; el pulsador rojo es el paro ' +
-        'de emergencia.'
+        'El corazón del refugio. Sus ventiladores recirculan la atmósfera de la cámara por tres ' +
+        'contenedores: cal sodada Drägersorb® 400 absorbe el CO2, ChamberCatalysis® cataliza el ' +
+        'CO y el sílice gel retira la humedad. El aire limpio vuelve por las dos salidas del ' +
+        'frente. Cada carga de Drägersorb rinde 5 h, una hora menos por cada 5 ocupantes de más.'
     },
     {
       sub: 'cilindros_o2', yaw: 18, pitch: 4, dist: 1.05, dur: 7,
-      titulo: '10 · Batería de cilindros de O2',
+      titulo: '6 · Batería de cilindros de O2',
       texto:
-        'Reserva de oxígeno de alta presión que alimenta a la BPU y regenera la atmósfera. ' +
-        'Junto a ellos va el cartel del procedimiento de suministro: se abren en el orden ' +
-        'indicado y se controla el caudal según el número de ocupantes.'
+        'Reserva de alta presión que repone el oxígeno consumido. Un refugio de 20 personas lleva ' +
+        'TRES cilindros para 48 h. Se abren de UNO EN UNO: agotado el primero se cierra su válvula ' +
+        'y se abre lentamente la del siguiente. El caudal se ajusta a 0,5 l/min por persona — ' +
+        '10 l/min con el refugio lleno — según el cartel de procedimiento que va al lado.'
     },
     {
       sub: 'banco_baterias', yaw: 168, pitch: 12, dist: 1.0, dur: 7,
-      titulo: '11 · Gabinete de baterías de respaldo',
+      titulo: '7 · Gabinete de baterías de respaldo',
       texto:
         'Anexo adosado al testero, con rejillas louver para disipar calor y etiqueta de ' +
-        'riesgo eléctrico. Da energía ininterrumpida a la BPU, la iluminación y el aire ' +
+        'riesgo eléctrico. Da energía ininterrumpida a la UnidadREFUGE®, la iluminación y el aire ' +
         'acondicionado cuando cae la red de mina — el caso para el que existe el refugio.'
     },
     {
       sub: 'equipos_baterias', yaw: 150, pitch: 30, dist: 1.25, dur: 5.5,
-      titulo: '12 · Equipos sobre el gabinete',
+      titulo: '8 · Equipos sobre el gabinete',
       texto:
         'Rectificador/cargador y accesorios montados sobre el anexo, fuera del alcance del ' +
         'agua de escorrentía de la labor y del tránsito de equipo pesado.'
     },
     {
-      sub: 'delineador_gabinete', yaw: -155, pitch: 10, dist: 1.5, dur: 4.5,
-      titulo: '13 · Poste delineador de esquina',
-      texto:
-        'Delineador reflectivo en la esquina saliente del gabinete: protege la instalación ' +
-        'de un golpe de scoop o dumper y da referencia de gálibo al operador.'
-    },
-    {
       sub: 'instrumentacion', yaw: -52, pitch: 18, dist: 0.9, dur: 7,
-      titulo: '14 · Instrumentación y aire acondicionado',
+      titulo: '9 · Instrumentación y aire acondicionado',
       texto:
         'Monitores fijos de gases (tipo Dräger Polytron), manómetros de la línea de O2 y ' +
         'split de climatización. Con 20 personas encerradas, controlar temperatura y ' +
         'humedad es tan crítico como el propio oxígeno.'
     },
     {
-      sub: 'tuberia', yaw: 62, pitch: 32, dist: 0.95, dur: 5,
-      titulo: '15 · Tubería aérea de servicios',
-      texto:
-        'Líneas de aire y agua tendidas bajo la bóveda con abrazaderas. La conexión a la ' +
-        'línea de aire comprimido de mina es el respaldo externo de la atmósfera del ' +
-        'refugio.'
-    },
-    {
-      sub: 'iluminacion_interior', yaw: 42, pitch: 28, dist: 0.95, dur: 5.5,
-      titulo: '16 · Iluminación interior',
-      texto:
-        'LED lineal corrido en la bóveda más luminarias en la precámara, todo alimentado ' +
-        'por las baterías. Luz permanente y sin calor: reduce el pánico y permite leer los ' +
-        'instructivos durante toda la espera.'
-    },
-    {
       sub: 'asientos', yaw: 56, pitch: 16, dist: 0.95, dur: 7,
-      titulo: '17 · Asientos y almacenamiento',
+      titulo: '10 · Asientos y almacenamiento',
       texto:
         'Bancas-cajón con cojín y respaldo a ambos costados: 20 plazas sentadas y, bajo ' +
         'ellas, el almacenamiento de raciones de supervivencia, agua, botiquín, frazadas y ' +
         'el baño químico.'
     },
-    {
-      sub: 'acabados_interiores', yaw: 30, pitch: 20, dist: 1.0, dur: 5,
-      titulo: '18 · Acabados interiores',
-      texto:
-        'Piso antideslizante, costillas de los paneles de pared y sensores de bóveda. ' +
-        'Superficies claras y lavables: facilitan la limpieza y la inspección periódica ' +
-        'exigida al refugio.'
-    },
-    // ── SEÑALÉTICA INTERIOR, LETRERO POR LETRERO ────────────────────────────
-    // Cada rótulo es un subelemento propio y se visita por separado: agrupados no se leía
-    // ninguno (ver la nota en el bloque de construcción de los letreros). Estos pasos no llevan
-    // `texto`: heredan la descripción del subelemento, que es la misma ficha que muestra el
-    // visor al aislarlo desde la lista.
-    //
-    // El YAW es aquí una restricción de VISIBILIDAD, no una preferencia estética: los letreros
-    // son planos de una cara pegados al hastial mirando hacia adentro, así que la cámara tiene
-    // que quedar del lado interior. Pared +Z (costado del logo) ⇒ yaw NEGATIVO; pared −Z
-    // (costado del acceso) ⇒ yaw POSITIVO. Se mantiene dentro de ±20° de la normal para que el
-    // rótulo no se lea escorzado.
-    { sub: 'letrero_tanque_co',            yaw: -100, pitch: -2, dist: 1.05, dur: 5,   titulo: '19 · Letrero — tanque de monóxido' },
-    { sub: 'letrero_catalizador_co',       yaw:  -84, pitch: -2, dist: 1.05, dur: 5,   titulo: '20 · Letrero — catalizador de CO' },
-    { sub: 'letrero_raciones_alimentos',   yaw:  -96, pitch: -3, dist: 0.95, dur: 7.5, titulo: '21 · Instructivo — raciones alimenticias' },
-    { sub: 'letrero_raciones_agua',        yaw:  -86, pitch: -3, dist: 0.95, dur: 7,   titulo: '22 · Instructivo — raciones de agua' },
-    { sub: 'letrero_procedimiento_o2',     yaw:   92, pitch:  0, dist: 0.95, dur: 7,   titulo: '23 · Cartel — suministro de oxígeno' },
-    { sub: 'letrero_diagrama_agua',        yaw:   84, pitch: -2, dist: 1.05, dur: 5,   titulo: '24 · Letrero — diagrama de agua' },
-    { sub: 'letrero_procedimiento_ingreso', yaw:  96, pitch: -2, dist: 1.05, dur: 5.5, titulo: '25 · Letrero — procedimiento de ingreso' },
-    { sub: 'plano_rescate_nivel',          yaw:   88, pitch:  0, dist: 1.0,  dur: 7,   titulo: '26 · Plano — esquema de rescate NV-1600' },
-    { sub: 'plano_ubicacion_refugios',     yaw:   94, pitch:  0, dist: 1.0,  dur: 6,   titulo: '27 · Plano — ubicación de refugios' },
+    { sub: 'letrero_catalizador_co',       yaw:  -84, pitch: -2, dist: 1.05, dur: 5,   titulo: '11 · Letrero — catalizador de CO' },
+    { sub: 'letrero_raciones_alimentos',   yaw:  -96, pitch: -3, dist: 0.95, dur: 7.5, titulo: '12 · Instructivo — raciones alimenticias' },
+    { sub: 'letrero_raciones_agua',        yaw:  -86, pitch: -3, dist: 0.95, dur: 7,   titulo: '13 · Instructivo — raciones de agua' },
+    { sub: 'letrero_procedimiento_o2',     yaw:   92, pitch:  0, dist: 0.95, dur: 7,   titulo: '14 · Cartel — suministro de oxígeno' },
+    { sub: 'plano_rescate_nivel',          yaw:   88, pitch:  0, dist: 1.0,  dur: 7,   titulo: '15 · Plano — esquema de rescate NV-1600' },
+    { sub: 'plano_ubicacion_refugios',     yaw:   94, pitch:  0, dist: 1.0,  dur: 6,   titulo: '16 · Plano — ubicación de refugios' },
     {
       sub: null, yaw: -142, pitch: 26, dist: 1.15, dur: 8,
       titulo: 'Conjunto — procedimiento de uso',
       texto:
-        'Resumen: ingresar por la esclusa, cerrar ambas puertas estancas, activar la BPU, ' +
-        'abrir el oxígeno según el cartel de procedimiento y comunicar por la línea de ' +
-        'vida. Racionar consumibles y esperar al equipo de rescate: 36 horas de autonomía ' +
-        'para 20 personas.'
+        'Resumen del manual: entrar girando ambas manillas HACIA ARRIBA, cerrar la puerta ' +
+        'girando HACIA ABAJO, cruzar la esclusa y sellar la segunda puerta. No quitarse el ' +
+        'autorrescatador hasta comprobar en el monitor que hay O2 sobre 19,5 %, CO2 bajo ' +
+        '4000 ppm y CO bajo 40 ppm. Cargar la UnidadREFUGE®, abrir un cilindro de oxígeno al ' +
+        'caudal que marque la tabla y esperar en reposo: cualquier actividad gasta más oxígeno.'
     }
   ]
 };
@@ -459,8 +388,15 @@ function _texturaMapa(sem = 1) {
   return canvas;
 }
 
-/** Logo "Dräger | SIMSA — Breathing Protection Unit" para el frente de la BPU. */
-function _texturaBPU() {
+/**
+ * Logo "Dräger | SIMSA — UnidadREFUGE®" para el frente de la unidad purificadora.
+ *
+ * El nombre del equipo es **UnidadREFUGE®** y el de la estación de refugio **ChamberREF®**
+ * (Manual de Operación Dräger|SIMSA, esquema general p.6-7 y cap. III-5). Antes esto decía
+ * "Breathing Protection Unit", que no es la denominación del fabricante: iba PINTADO sobre el
+ * frente del gabinete, así que era una marca inventada a la vista del jugador.
+ */
+function _texturaUnidadRefuge() {
   const { canvas, ctx } = _lienzo(512, 160);
   ctx.clearRect(0, 0, 512, 160);
   ctx.fillStyle = '#ffffff';
@@ -473,25 +409,55 @@ function _texturaBPU() {
   ctx.beginPath(); ctx.moveTo(240, 20); ctx.lineTo(240, 92); ctx.stroke();
   ctx.font = '44px Arial, sans-serif';
   ctx.fillText('SIMSA', 260, 56);
-  ctx.font = '30px Arial, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.fillText('Breathing Protection Unit', 24, 122);
+  ctx.font = 'bold 34px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.fillText('UnidadREFUGE', 24, 122);
+  // El ® va alzado y pequeño, como en el manual. Se mide ANTES de cambiar la fuente:
+  // `measureText` usa la fuente activa, y midiendo con la chica el símbolo se solapaba.
+  const anchoNombre = ctx.measureText('UnidadREFUGE').width;
+  ctx.font = '18px Arial, sans-serif';
+  ctx.fillText('®', 24 + anchoNombre + 4, 108);
   return canvas;
 }
 
 /**
- * Cara del panel de control de la BPU (render Dräger): panel blanco con
+ * Letrero de la ESCOTILLA DE ESCAPE (foto real del refugio): placa blanca con filete negro y
+ * TRES renglones — el título y, debajo y en cuerpo menor, la advertencia de uso.
+ * No es un cartel de "vía de escape" verde: es una placa de instrucción, blanca y sobria,
+ * atornillada al hastial junto a la escotilla.
+ */
+function _texturaSalidaEmergencia() {
+  // El lienzo se dimensiona a partir del renglón MÁS LARGO. Con un ancho fijo de 512 el título
+  // desbordaba y se leía "ALIDA DE EMERGENCI": el texto se recortaba por los dos lados.
+  const W = 660, Hh = 210;
+  const { canvas, ctx } = _lienzo(W, Hh);
+  ctx.fillStyle = '#f2f1ec'; ctx.fillRect(0, 0, W, Hh);
+  ctx.strokeStyle = '#1b1b18'; ctx.lineWidth = 5;
+  ctx.strokeRect(7, 7, W - 14, Hh - 14);
+  ctx.fillStyle = '#141412';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 46px Arial, sans-serif';
+  ctx.fillText('SALIDA DE EMERGENCIA', W / 2, 62);
+  ctx.font = 'bold 38px Arial, sans-serif';
+  ctx.fillText('ABRIR SOLO EN', W / 2, 124);
+  ctx.fillText('CASO DE EMERGENCIA', W / 2, 168);
+  return canvas;
+}
+
+/**
+ * Cara del PANEL DE CONTROL de la UnidadREFUGE® (manual p.20): panel blanco con
  * indicadores verdes/rojos, dial y diagrama de flujo del sistema.
  */
-function _texturaPanelBPU() {
+function _texturaPanelUnidadRefuge() {
   const { canvas, ctx } = _lienzo(360, 240);
   ctx.fillStyle = '#f2f2ec'; ctx.fillRect(0, 0, 360, 240);
   ctx.strokeStyle = '#9a9a92'; ctx.lineWidth = 4; ctx.strokeRect(4, 4, 352, 232);
   // título
   ctx.fillStyle = '#12307e'; ctx.font = 'bold 20px Arial, sans-serif'; ctx.textAlign = 'left';
   ctx.fillText('Dräger', 16, 30);
-  ctx.fillStyle = '#333'; ctx.font = '13px Arial, sans-serif';
-  ctx.fillText('Breathing Protection Unit', 92, 30);
+  ctx.fillStyle = '#333'; ctx.font = 'bold 13px Arial, sans-serif';
+  ctx.fillText('UnidadREFUGE®', 92, 30);
   // indicadores (2 filas de pilotos verdes/rojos/ámbar)
   const cols = ['#1db93c', '#1db93c', '#d21f1f', '#1db93c', '#d8a11a', '#1db93c'];
   for (let i = 0; i < 6; i++) {
@@ -618,7 +584,7 @@ function _texturaMatting() {
 }
 
 /**
- * RÓTULO DE TOLVA de la BPU: banda NARANJA con el texto en blanco sobre el frente azul de cada
+ * RÓTULO DE TOLVA de la UnidadREFUGE®: banda NARANJA con el texto en blanco sobre el frente azul de cada
  * tolva de carga. Identifica qué consumible lleva cada una — se rellenan a mano durante el
  * encierro y confundirlas dejaría la atmósfera sin tratar, por eso van rotuladas en alto
  * contraste. Una o dos líneas según el texto.
@@ -1646,7 +1612,7 @@ function _polytron5000({ valor = '19.7', unidad = 'Vol%', gas = null, colorGas =
  * con las marcas de fabricación estarcidas en el hombro y cinta verde de gas;
  * ojiva del mismo color (no lleva capa verde), pie reforzado y cuello roscado.
  * Sigue siendo parametrizable para las variantes del diagrama Dräger
- * (negros de alta presión, azules de la BPU).
+ * (negros de alta presión, azules de la UnidadREFUGE®).
  *
  * @param {number} alto   altura del tramo cilíndrico
  * @param {number} radio  radio del cilindro
@@ -2372,7 +2338,7 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   piso.receiveShadow = true;
   S.add(piso);
 
-  // Pared trasera (-X, fondo donde va la BPU)
+  // Pared trasera (-X, fondo donde va la UnidadREFUGE®)
   const parTras = new THREE.Mesh(new THREE.BoxGeometry(t, H, A), mAcero);
   parTras.position.set(-L / 2, y0 + H / 2, 0);
   parTras.castShadow = true;
@@ -3142,7 +3108,7 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   //  5. ASIENTOS Y ALMACENAMIENTO — bancas-cajón con cojín y respaldo
   // ════════════════════════════════════════════════════════════════
   // Bancas ampliadas HASTA EL FONDO: la +Z llega a la pared trasera; la -Z
-  // deja el hueco de los balones de O2 blancos (grupo 2×2 junto a la BPU)
+  // deja el hueco de los balones de O2 blancos (grupo 2×2 junto a la UnidadREFUGE®)
   S = sub(g, 'asientos', 'Asientos y almacenamiento',
     'Bancas-pañol con tapas abatibles, cojín forrado y respaldo. Un compartimento ' +
     'abierto por costado muestra la estiba real: baldes de químicos con punto ' +
@@ -3219,8 +3185,12 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   lente.position.set(-2.25, y0 + H + 0.03, 0);
   S.add(lente);
 
-  // ── Unidad de Protección Respiratoria (BPU) "Dräger | SIMSA" ──────
-  S = sub(g, 'bpu', 'BPU Dräger | SIMSA', 'Unidad de protección respiratoria: gabinete azul, panel de control, paro de emergencia y torretas.');
+  // ── UnidadREFUGE® — central purificadora de aire "Dräger | SIMSA" ──
+  S = sub(g, 'bpu', 'UnidadREFUGE® Dräger | SIMSA',
+    'Central purificadora de aire: gabinete azul con panel de control, paro de emergencia y ' +
+    'las dos salidas de aire. Recircula la atmósfera de la cámara por tres contenedores — cal ' +
+    'sodada Drägersorb® 400 (absorbe CO2), ChamberCatalysis® (cataliza el CO) y sílice gel ' +
+    '(absorbe humedad) — con un ventilador por contenedor.');
   const bpu = new THREE.Group();
   bpu.position.set(-L / 2 + 0.55, y0 + t, 0); // contra el fondo (las baterías van en la recámara exterior)
   S.add(bpu);
@@ -3266,12 +3236,12 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   bpu.add(franja);
   const caraPanel = new THREE.Mesh(
     new THREE.PlaneGeometry(0.58, 0.105),
-    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPanelBPU()), roughness: 0.5 })
+    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPanelUnidadRefuge()), roughness: 0.5 })
   );
   caraPanel.rotation.y = Math.PI / 2;
   caraPanel.position.set(gabD / 2 + 0.014, yPanel, 0);
   bpu.add(caraPanel);
-  // El observador mira la BPU desde +X, así que SU izquierda es +Z: los interruptores quedan
+  // El observador mira la UnidadREFUGE® desde +X, así que SU izquierda es +Z: los interruptores quedan
   // en +Z y los pulsadores en -Z, en el mismo orden que la foto.
   const mInterr = MineMaterials.plano(0xc9c9c2, { rough: 0.35, metal: 0.7 });
   for (const iz of [0.225, 0.160]) {
@@ -3359,16 +3329,16 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   etiqueta.rotation.y = Math.PI / 2;
   etiqueta.position.set(gabD / 2 + 0.002, 0.20, 0.20);
   bpu.add(etiqueta);
-  // logo Dräger | SIMSA — Breathing Protection Unit
+  // logo Dräger | SIMSA — UnidadREFUGE®
   const bpuLogo = new THREE.Mesh(
     new THREE.PlaneGeometry(0.5, 0.16),
-    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaBPU()), transparent: true, roughness: 0.5 })
+    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaUnidadRefuge()), transparent: true, roughness: 0.5 })
   );
   bpuLogo.rotation.y = Math.PI / 2;
   bpuLogo.position.set(gabD / 2 + 0.022, 0.31, 0);
   bpu.add(bpuLogo);
 
-  // ── BATERÍA DE CILINDROS DE O2 junto a la BPU, con eslinga de carraca
+  // ── BATERÍA DE CILINDROS DE O2 junto a la UnidadREFUGE®, con eslinga de carraca
   //    y manifold colgado sobre ellos ─────────────────────────────────
   S = sub(g, 'cilindros_o2', 'Cilindros de O2',
     'Batería de CUATRO cilindros crema en fila contra el costado, con marcas ' +
@@ -3862,7 +3832,7 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     new THREE.Vector3(0.36, 0.10, 0.92)
   ]);
   eq.add(new THREE.Mesh(new THREE.TubeGeometry(curvaCond, 24, 0.022, 7, false), mCableGrueso));
-  // pasamuros del cable de fuerza hacia la BPU
+  // pasamuros del cable de fuerza hacia la UnidadREFUGE®
   const pasamuros = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 12), mMarco);
   pasamuros.rotation.z = Math.PI / 2;
   pasamuros.position.set(deckD - 0.02, 0.34, -1.30);
@@ -4241,7 +4211,7 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
       sz: 1, x: -1.30, texto: 'CATALIZADOR DE CO',
       id: 'letrero_catalizador_co', nombre: 'Letrero — catalizador de CO',
       desc: 'Rotulación del catalizador de monóxido, que transforma el CO en CO2 para que la ' +
-            'cal sodada de la BPU pueda retirarlo. Es el consumible crítico tras un incendio, ' +
+            'cal sodada de la UnidadREFUGE® pueda retirarlo. Es el consumible crítico tras un incendio, ' +
             'que es precisamente cuando el refugio se ocupa.'
     },
     {
@@ -4359,6 +4329,119 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   marcoProc.position.set(-1.30, y0 + 1.44, -(A / 2 - t - 0.012) - 0.004);
   S.add(marcoProc);
 
+  // ── SALIDA DE EMERGENCIA (escotilla de escape) ───────────────────
+  // Componente rotulado del esquema general del manual (p.6-7) y con capítulo propio (cap. V):
+  // cuando un derrumbe bloquea la puerta principal, se evacua por AQUÍ. Va en el muro IZQUIERDO
+  // AL FONDO — izquierda de quien ya entró y mira al interior, es decir el costado +Z hacia -X —
+  // y el ocupante sentado justo debajo es quien la desbloquea y la sostiene abierta mientras
+  // salen los demás uno a uno. Sin ella el refugio tenía un solo acceso, que es justo el
+  // supuesto que el procedimiento de emergencia da por perdido.
+  S = sub(g, 'salida_emergencia', 'Salida de emergencia (escotilla)',
+    'Escotilla de escape del muro izquierdo al fondo, sobre la banca. Hoja de esquinas muy ' +
+    'redondeadas del mismo crema que los paneles, con dos pomos de enclavamiento a la izquierda ' +
+    'y bisagras a la derecha. Con la puerta principal bloqueada es la única vía: el ocupante ' +
+    'sentado debajo la desbloquea y la mantiene abierta hasta que han salido todos.');
+  {
+    const zPared = A / 2 - t - 0.010;
+    // Foto real: la hoja es MÁS ALTA QUE ANCHA y de radio de esquina muy generoso — es una
+    // escotilla de presión, no una tapa de registro rectangular.
+    const escW = 0.66, escH = 0.80, radio = 0.10;
+    const yEsc = y0 + 1.30;                         // sobre el respaldo de la banca
+    const xEsc = -L / 2 + 1.45;                     // al fondo (-X), despejado del testero
+    // Va pintada del MISMO crema que los paneles del refugio, no en acero desnudo: en las fotos
+    // la escotilla apenas se distingue del hastial salvo por el marco y los herrajes.
+    const mHoja = MineMaterials.plano(0xe3dfd2, { rough: 0.82, metal: 0.06 });
+    const mHerraje = MineMaterials.plano(0xf0eee6, { rough: 0.6, metal: 0.25 });
+    const mPomo = MineMaterials.plano(0x1a1a18, { rough: 0.45, metal: 0.35 });
+
+    /** Rectángulo de esquinas redondeadas centrado en el origen (plano XY). */
+    const formaRedonda = (w, h, r) => {
+      const s = new THREE.Shape();
+      const x = -w / 2, y = -h / 2;
+      s.moveTo(x + r, y);
+      s.lineTo(x + w - r, y);       s.quadraticCurveTo(x + w, y, x + w, y + r);
+      s.lineTo(x + w, y + h - r);   s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      s.lineTo(x + r, y + h);       s.quadraticCurveTo(x, y + h, x, y + h - r);
+      s.lineTo(x, y + r);           s.quadraticCurveTo(x, y, x + r, y);
+      return s;
+    };
+
+    // MARCO: anillo embutido en el hastial (forma exterior con la hoja recortada como hueco).
+    const marco = formaRedonda(escW + 0.10, escH + 0.10, radio + 0.05);
+    marco.holes.push(formaRedonda(escW + 0.012, escH + 0.012, radio));
+    const gMarco = new THREE.ExtrudeGeometry(marco, { depth: 0.045, bevelEnabled: false });
+    const mallaMarco = new THREE.Mesh(gMarco, mHoja);
+    mallaMarco.position.set(xEsc, yEsc, zPared - 0.045);
+    S.add(mallaMarco);
+
+    // HOJA: chapa maciza de esquinas redondeadas, montada por dentro contra su junta.
+    const gHoja = new THREE.ExtrudeGeometry(formaRedonda(escW, escH, radio), { depth: 0.032, bevelEnabled: false });
+    const hoja = new THREE.Mesh(gHoja, mHoja);
+    hoja.position.set(xEsc, yEsc, zPared - 0.060);
+    S.add(hoja);
+
+    // POMOS DE ENCLAVAMIENTO — a la IZQUIERDA de la hoja SEGÚN LA VE EL OCUPANTE, sobre
+    // pletinas blancas. Ojo con el lado: quien mira este hastial desde dentro está mirando
+    // hacia +Z, así que su izquierda es +X (no -X). Puestos al revés, los pomos quedaban del
+    // lado de las bisagras — la escotilla no se podría abrir.
+    const xPomos = xEsc + escW / 2 + 0.035;
+    for (const dy of [0.235, -0.235]) {
+      const pletina = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.13, 0.030), mHerraje);
+      pletina.position.set(xPomos, yEsc + dy, zPared - 0.070);
+      S.add(pletina);
+      const vastago = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), mPomo);
+      vastago.rotation.x = Math.PI / 2;
+      vastago.position.set(xPomos, yEsc + dy, zPared - 0.098);
+      S.add(vastago);
+      const pomo = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 10), mPomo);
+      pomo.scale.z = 0.75;
+      pomo.position.set(xPomos, yEsc + dy, zPared - 0.122);
+      S.add(pomo);
+    }
+
+    // BISAGRAS enfrente de los pomos (-X): dos pletinas que abrazan el canto de la hoja.
+    for (const dy of [0.26, -0.26]) {
+      const bis = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.075, 0.026), mHerraje);
+      bis.position.set(xEsc - escW / 2 + 0.005, yEsc + dy, zPared - 0.074);
+      S.add(bis);
+    }
+
+    // PLACA DE INSTRUCCIÓN sobre la escotilla, mirando al interior de la cámara.
+    const lienzoEsc = _texturaSalidaEmergencia();
+    const anchoRot = 0.30;
+    const rot = new THREE.Mesh(
+      new THREE.PlaneGeometry(anchoRot, anchoRot * (lienzoEsc.height / lienzoEsc.width)),
+      new THREE.MeshStandardMaterial({ map: _aTextura(lienzoEsc), roughness: 0.62 })
+    );
+    rot.position.set(xEsc, yEsc + escH / 2 + 0.14, zPared - 0.004);
+    rot.rotation.y = Math.PI;                       // se lee DESDE DENTRO
+    S.add(rot);
+  }
+
+  // ── VÁLVULAS DE SOBREPRESIÓN ─────────────────────────────────────
+  // También del esquema general (p.6-7). Son la contraparte física de la SOBREPRESIÓN que
+  // mantiene fuera el gas: el aire que inyecta el oxígeno tiene que poder salir, o la cámara se
+  // presurizaría sin control. Van altas, junto al arranque de la bóveda del frente.
+  S = sub(g, 'valvulas_sobrepresion', 'Válvulas de sobrepresión',
+    'Válvulas de alivio en el arranque de la bóveda: dejan escapar el exceso de aire y sostienen ' +
+    'la sobrepresión interior que impide la entrada de gases de la labor.');
+  {
+    const mCuerpo = MineMaterials.plano(0x8e8a80, { rough: 0.42, metal: 0.75 });
+    const mCapucha = MineMaterials.plano(0x3d3a35, { rough: 0.6, metal: 0.3 });
+    for (const sz of [1, -1]) {
+      const zP = sz * (A / 2 - t - 0.02);
+      const cuello = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.10, 12), mCuerpo);
+      cuello.rotation.x = Math.PI / 2;
+      cuello.position.set(L / 2 - 0.85, y0 + H - 0.22, zP);
+      S.add(cuello);
+      // Capucha cónica: impide que el agua de escorrentía entre por la válvula.
+      const capucha = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.06, 12), mCapucha);
+      capucha.rotation.x = sz > 0 ? -Math.PI / 2 : Math.PI / 2;
+      capucha.position.set(L / 2 - 0.85, y0 + H - 0.22, zP + sz * 0.075);
+      S.add(capucha);
+    }
+  }
+
   // ════════════════════════════════════════════════════════════════
   //  INTERACCIÓN
   // ════════════════════════════════════════════════════════════════
@@ -4445,7 +4528,7 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   g.userData.tick(0); // estado inicial coherente (verde encendida)
 
   // Objeto interactuable = MARCO/frente de la puerta: con el casco ya sólido, el jugador debe
-  // poder abrir desde AFUERA (el gabinete BPU del fondo quedaría fuera del alcance del rayo).
+  // poder abrir desde AFUERA (el gabinete de la UnidadREFUGE® del fondo quedaría fuera del alcance del rayo).
   g.userData.interactable = {
     object: marco,
     descriptor: {
@@ -4454,17 +4537,21 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
         abierto = !abierto;
         setEstado(abierto);
         window.__mina?.bus.emit('ui:read', {
-          title: `REFUGIO MINERO DRÄGER N°${numero} — NEXA`,
+          title: `ESTACIÓN DE REFUGIO CHAMBERREF® N°${numero} — DRÄGER | SIMSA`,
           body:
-            (abierto ? 'Estado: OCUPADO (semáforo rojo). ' : 'Estado: DISPONIBLE (semáforo verde). ') +
-            'Cámara de rescate Dräger | SIMSA. Capacidad: 20 personas. ' +
+            (abierto ? 'Estado: OCUPADO (luz roja: en baterías). ' : 'Estado: DISPONIBLE (luz verde: en línea 220 VAC). ') +
+            'Estación de refugio móvil de DOBLE CÁMARA. Capacidad: 20 personas. ' +
             'ANATOMÍA: 1) PRECÁMARA (esclusa) — área de transición que evita el ingreso de ' +
-            'gases tóxicos; 2) BPU — unidad de protección respiratoria que purifica el aire; ' +
+            'gases tóxicos; 2) UnidadREFUGE® — central purificadora: Drägersorb® 400 absorbe el ' +
+            'CO2, ChamberCatalysis® cataliza el CO y el sílice gel retira la humedad; ' +
             '3) BANCO DE BATERÍAS — energía ininterrumpida para iluminación y A/C; ' +
-            '4) CILINDROS DE O2 — reservas de alta presión para regenerar la atmósfera; ' +
-            '5) ASIENTOS Y ALMACENAMIENTO — raciones de supervivencia, agua y botiquín. ' +
-            'PROCEDIMIENTO: ingresar por la esclusa, sellar ambas puertas estancas, activar la ' +
-            'BPU, abrir el O2 y comunicar por la línea de vida hasta el rescate. Autonomía: 36 h.'
+            '4) CILINDROS DE O2 — tres cilindros de alta presión, se abren de uno en uno; ' +
+            '5) ASIENTOS Y ALMACENAMIENTO — raciones, agua y botiquín bajo las bancas. ' +
+            'PROCEDIMIENTO: entrar girando ambas manillas hacia ARRIBA y cerrarlas hacia ABAJO; ' +
+            'sellar la segunda puerta; NO quitarse el autorrescatador hasta verificar en el ' +
+            'monitor O2 > 19,5 %, CO2 < 4000 ppm y CO < 40 ppm; cargar la UnidadREFUGE® y abrir ' +
+            'un cilindro a 0,5 l/min por persona. Salida de emergencia: escotilla del muro ' +
+            'izquierdo al fondo. Autonomía: 48 h (protección hasta 96 h).'
         });
       }
     }

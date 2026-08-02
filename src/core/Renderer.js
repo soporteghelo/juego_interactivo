@@ -39,7 +39,10 @@ export class Renderer {
   }
 
   _applyQuality(q) {
-    const ratio = Math.min(window.devicePixelRatio || 1, q.pixelRatioCap);
+    // El tope viene del preset; la ESCALA (PerfMonitor) es el ajuste fino que hay por debajo
+    // del preset mas bajo. Nunca por debajo de 0.5 dispositivo-pixeles: mas abajo el HUD y la
+    // señaletica de la mina dejan de leerse.
+    const ratio = Math.max(0.5, Math.min(window.devicePixelRatio || 1, q.pixelRatioCap) * Settings.resolutionScale);
     this.instance.setPixelRatio(ratio);
 
     this.instance.shadowMap.enabled = q.shadows;
