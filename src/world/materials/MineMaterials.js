@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import {
-  texturaRoca, texturaShotcrete, texturaBarro, texturaLodo, texturaMetal, texturaGrunge,
+  texturaRoca, texturaShotcrete, texturaLodo, texturaMetal, texturaGrunge,
   texturaRocaTunel, texturaRocaTunelNormal, texturaRocaTunelRough, texturaAguaNormal,
-  texturaOxidoEscurrido, texturaManga
+  texturaOxidoEscurrido, texturaManga, texturaPisoMina, texturaPisoMinaNormal
 } from './Texturas.js';
 
 /**
@@ -135,12 +135,24 @@ class MaterialLibrary {
     );
   }
 
-  /** Barro/suelo mojado: humedo, con lamina de agua reflectiva pero controlada. */
+  /**
+   * Barro/suelo mojado de LABOR: humedo, con lamina de agua reflectiva pero controlada, y con la
+   * HUELLA DE NEUMATICO del equipo pesado impresa en los dos carriles de rodadura (md, "Pisos y
+   * pasaje"). El `normalMap` es lo que hace que el taco se hunda de verdad bajo el rasante del
+   * headlamp; sin el, la huella se leia como una calcomania pintada sobre el barro.
+   *
+   * Exige UV METRICA en el piso (U=0..1 a lo ancho, V en metros/ESCALA_PISO_V): los carriles van
+   * horneados a U fija para caer justo sobre los surcos que talla `BaseSegment._buildFloor`.
+   */
   barroMojado() {
     return this._get('barro', () =>
       new THREE.MeshPhysicalMaterial({
         color: 0x9a9088,
-        map: texturaBarro(),
+        map: texturaPisoMina(),
+        normalMap: texturaPisoMinaNormal(),
+        // Contenido: el piso se ve casi siempre en rasante, y un relieve fuerte competiria con
+        // el clearcoat del barro mojado y le quitaria el reflejo.
+        normalScale: new THREE.Vector2(0.6, 0.6),
         // Mas mojado (md: piso muy reflectivo, casi en todas las escenas): baja la rugosidad
         // y sube el clearcoat/lo hace mas liso para que el env-map (LED/bombillas) espeje en el
         // piso. Sigue siendo piso (no charco), asi que el reflejo es difuso, no de espejo.

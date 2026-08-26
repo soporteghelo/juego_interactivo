@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BaseSegment } from '../segments/BaseSegment.js';
 import { MineMaterials } from '../materials/MineMaterials.js';
+import { createRockFaceGeo } from '../segments/TunnelGeometry.js';
 import { RoomSegment } from './RoomSegment.js';
 
 /**
@@ -109,26 +110,21 @@ export class TerminalLaborSegment extends RoomSegment {
   }
 
   _buildBlindFace(tunnelGroup) {
-    const halfW = this.width / 2;
-    // Misma herradura que la carcasa de la labor (archRatio variable): si no, el frente ciego
-    // dejaba una media luna abierta contra la corona.
-    const wallTop = this.height * (1 - (this.variant.archRatio ?? 0.40));
-    const archH = this.height - wallTop;
-    const shape = new THREE.Shape();
-    shape.moveTo(-halfW, 0);
-    shape.lineTo(-halfW, wallTop);
-    for (let i = 0; i <= 14; i++) {
-      const theta = Math.PI - (Math.PI * i) / 14;
-      shape.lineTo(halfW * Math.cos(theta), wallTop + archH * Math.sin(theta));
-    }
-    shape.lineTo(halfW, 0);
-    shape.closePath();
-
     const material = MineMaterials.rocaTunel().clone();
-    material.flatShading = true;
     material.side = THREE.DoubleSide;
     material.needsUpdate = true;
-    const face = new THREE.Mesh(new THREE.ShapeGeometry(shape, 4), material);
+    // TOPE DE ROCA, no una chapa. Antes esto era una `ShapeGeometry` PLANA de 15 triangulos: una
+    // lamina de 30 m2 sin relieve al fondo de la labor no se lee como el frente de avance, se lee
+    // como un PANEL puesto delante, y hacia creer que la labor estaba TAPADA. `createRockFaceGeo`
+    // la hunde hacia la roca (mas en el eje, como deja el arranque) y la quiebra con fBm, casando
+    // vertice a vertice con la herradura de esta labor.
+    const faceGeo = createRockFaceGeo({
+      width: this.width,
+      height: this.height,
+      archRatio: this.variant.archRatio ?? 0.40,
+      rockType: this.variant.rockType ?? 'caliza'
+    });
+    const face = new THREE.Mesh(faceGeo, material);
     face.position.z = -this.length - 0.015;
     face.name = 'frente_ciego_rocoso';
     face.receiveShadow = true;

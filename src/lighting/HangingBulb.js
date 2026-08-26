@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MineMaterials, PALETTE } from '../world/materials/MineMaterials.js';
+import { crearHaz, hayHaz } from './haz_luz.js';
 
 /**
  * Bombilla incandescente colgante (md: amarillo-naranja calido #ffcc44, halo difuso en
@@ -33,6 +34,20 @@ export function createHangingBulb({ position, lighting }) {
     const light = new THREE.PointLight(PALETTE.bombillaCalida, 28, 18, 2);
     group.add(light);
     lighting.noteLight();
+  }
+
+  // HALO VOLUMETRICO (md: bombilla incandescente colgante = "halo difuso en neblina"). Cono muy
+  // abierto y corto apuntando al piso: una bombilla desnuda no proyecta un pincel, ilumina una
+  // campana de vaho a su alrededor. Gateado por `hazLuzFijas` (solo alto/medio).
+  if (hayHaz(true)) {
+    const haz = crearHaz({
+      angulo: Math.PI / 3.4,
+      alcance: 4.2,
+      color: PALETTE.bombillaCalida,
+      intensidad: 0.075
+    });
+    haz.rotation.x = -Math.PI / 2;   // el eje -Z local pasa a mirar hacia abajo (-Y)
+    group.add(haz);
   }
 
   return group;

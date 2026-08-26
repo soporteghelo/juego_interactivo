@@ -198,12 +198,17 @@ function makeMaterial({ service = false, floor = false } = {}) {
     material.vertexColors = true;
     material.side = THREE.DoubleSide;
     material.map = cloneWorldTexture(material.map, 0.82);
+    // Sin la huella de neumatico en relieve: las UV de este visor van en metros/3.6 y no en
+    // 0..1 a lo ancho de la labor, asi que los carriles horneados no caerian sobre ningun surco.
+    // Ademas aqui la mina se mira entera desde lejos, donde ese detalle no se aprecia.
+    material.normalMap = null;
     return material;
   }
   if (!service) {
-    // Material exclusivo de la mina completa. Sus UV ya estan expresadas en metros, por eso
-    // no se reutiliza el tiling 3x4 de los tuneles procedurales (producía manchas diminutas y
-    // un aspecto ruidoso). En calidad baja se conserva color+textura y se eliminan dos
+    // Material exclusivo de la mina completa. Sus UV van en metros/3.6 y este visor fija su
+    // PROPIO tiling en clones de la textura (cloneWorldTexture) — no hereda la escala metrica de
+    // la mina jugable (ESCALA_TEXTURA_ROCA), porque aqui se mira la malla entera desde lejos y
+    // conviene un grano mas grande. En calidad baja se conserva color+textura y se eliminan dos
     // muestras PBR costosas por pixel.
     const material = MineMaterials.rocaTunel().clone();
     material.map = cloneWorldTexture(material.map, 0.68);

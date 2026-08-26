@@ -1,4 +1,22 @@
 import * as THREE from 'three';
+import { ESCALA_TEXTURA_ROCA, ESCALA_PISO_V } from '../materials/Texturas.js';
+
+/**
+ * ARCO ACUMULADO del perfil de herradura, en METROS, punto a punto.
+ *
+ * Es la coordenada U de toda la roca de labor: recorre la seccion desde la solera de un hastial,
+ * sube por el, cruza la corona y baja por el otro. Al ser METRICA (y no `c/(cols-1)`), el grano de
+ * la roca mide lo mismo en una galeria de 6.8 m que en un acceso de 6.0 m, y —sobre todo— empalma
+ * con la interseccion del CSV y con el collar de boca, que ya venian en metros/2.4. Ademas es lo
+ * que hace que las MEDIAS CAÑAS del contorno queden separadas 0.6 m de verdad.
+ */
+function arcoPerfil(profile) {
+  const u = new Float32Array(profile.length);
+  for (let i = 1; i < profile.length; i++) {
+    u[i] = u[i - 1] + profile[i].distanceTo(profile[i - 1]);
+  }
+  return u;
+}
 
 // ── Ruido deterministico — misma tecnica que webgl_geometry_terrain_raycast ──
 // hash2 → smoothNoise (interpolacion de Hermite) → fbm (octavas fractales).
@@ -168,6 +186,8 @@ export function createTunnelShell({
 
   const cols = profile.length;
   const rows = segmentsZ + 1;
+  // U metrica sobre el perfil (ver arcoPerfil): misma escala de roca en toda la mina.
+  const arco = arcoPerfil(profile);
 
   const positions = [];
   const uvs       = [];
@@ -218,7 +238,11 @@ export function createTunnelShell({
 
       // nx>0 apunta al interior → (p - n*j) con j>0 empuja la superficie HACIA LA ROCA.
       positions.push(px - nx * j, py - ny * j, z);
-      uvs.push(c / (cols - 1), r / (rows - 1));
+      // UV METRICA: U = arco recorrido sobre el perfil, V = metros avanzados en la labor, ambos
+      // en baldosas de ESCALA_TEXTURA_ROCA. Antes iban normalizados 0..1, asi que un tramo de
+      // 12 m y otro de 32 m mostraban la MISMA roca a escalas distintas y la costura con el
+      // cruce (que ya venia en metros) saltaba a la vista.
+      uvs.push(arco[c] / ESCALA_TEXTURA_ROCA, -z / ESCALA_TEXTURA_ROCA);
 
       // ── Color: IDENTICO a nicho_electrico — THREE.Color lineal + fBm, sobre la rampa de la
       // litologia que le toco a esta labor (`rockType`).
@@ -280,6 +304,8 @@ export function createWireframeLaborShell({
   ];
   const cols = profile.length;
   const rows = Math.max(4, segmentsZ) + 1;
+  // U metrica: el perfil viene normalizado, asi que se escala a metros antes de medir el arco.
+  const arco = arcoPerfil(profile.map(([lat, ver]) => new THREE.Vector2(lat * width, ver * height)));
   const positions = [];
   const uvs = [];
   const colors = [];
@@ -324,7 +350,7 @@ export function createWireframeLaborShell({
         : Math.max(0, vertical * height * (1 + heightBreathe) + crownOverbreak);
 
       positions.push(x, y, z + zJitter);
-      uvs.push(col / (cols - 1), f * (length / 12));
+      uvs.push(arco[col] / ESCALA_TEXTURA_ROCA, (f * length) / ESCALA_TEXTURA_ROCA);
       const colorNoise = fbm(x * 0.72 + z * 0.21 + seedX, y * 0.8 + z * 0.16 + seedY, 4);
       const color = rampColor(colorNoise, rockType);
       colors.push(color.r, color.g, color.b);
@@ -384,6 +410,9 @@ export function createMouthCollarGeo({
   const { profile } = herraduraProfile(width, height, archRatio);
   const cy = height * 0.42;                 // centro de proyeccion, dentro de la herradura
   const n = profile.length;
+  // MISMA U que la carcasa del tunel que llega (arco sobre el perfil): asi las medias cañas y el
+  // grano de la roca CONTINUAN del hastial al collar sin salto en la junta.
+  const arco = arcoPerfil(profile);
 
   const positions = [], uvs = [], colors = [], indices = [];
 
@@ -415,7 +444,11 @@ export function createMouthCollarGeo({
     // en vez de dejar una rendija, aunque la labor tenga perfil facetado en vez de herradura.
     positions.push(p.x * (1 - inset), p.y * (1 - inset), 0);
     positions.push(ox, oy, wobble);         // contorno exterior: borde de la boca del cruce
-    uvs.push(p.x / 2.4, p.y / 2.4, ox / 2.4, oy / 2.4);
+    // U = arco del perfil (empalma con el tunel); V = cuanto se ha abierto el collar hacia la
+    // boca del cruce, en metros. Ambos en baldosas de ESCALA_TEXTURA_ROCA.
+    const abre = Math.hypot(ox - p.x, oy - p.y);
+    uvs.push(arco[i] / ESCALA_TEXTURA_ROCA, 0,
+             arco[i] / ESCALA_TEXTURA_ROCA, -abre / ESCALA_TEXTURA_ROCA);
 
     const cIn  = rampColor(fbm(p.x * 0.8 + 3.1, p.y * 0.7 + 5.7, 4), rockType);
     const cOut = rampColor(fbm(ox * 0.8 + 3.1, oy * 0.7 + 5.7, 4) * 0.85, rockType);
@@ -525,6 +558,7 @@ export function createHelicalTunnelShell({
   const cols = profile.length;
   const R = rows + 1;
   const arcLen = Math.abs(totalAngle) * radius;
+  const arco = arcoPerfil(profile);   // U metrica sobre el perfil, igual que el tunel recto
 
   const positions = [], uvs = [], colors = [], indices = [];
   const seedX = rng() * 231.7;
@@ -555,10 +589,9 @@ export function createHelicalTunnelShell({
 
       // Punto del eje del helicoide + offset (radial, vertical).
       positions.push(radius * ct + ct * lat, cy + ver, radius * st + st * lat);
-      // V con la MISMA densidad de texel que las VIAS (tunel: V normalizado sobre ~14 m con
-      // repeat(3,4) → ~1 mosaico cada ~3.5 m). Antes `along/1.5` daba un patron mucho mas
-      // apretado que la via → la rampa se veia con "otra textura". `along/14` iguala la escala.
-      uvs.push(c / (cols - 1), along / 14);
+      // Misma UV METRICA que el tunel recto: la rampa es una labor disparada igual que las demas,
+      // asi que lleva la misma escala de roca y las mismas medias cañas del contorno.
+      uvs.push(arco[c] / ESCALA_TEXTURA_ROCA, along / ESCALA_TEXTURA_ROCA);
 
       const sx = p.x * 0.85 + cy * 0.28 + seedX * 0.5;
       const sy = p.y * 0.75 + seedY * 0.5;
@@ -613,7 +646,9 @@ export function createHelicalFloorBerma({
     for (let c = 0; c < fCols; c++) {
       const lat = -halfW + (width * c) / across;
       fPos.push(radius * ct + ct * lat, cy + 0.01, radius * st + st * lat);
-      fUv.push(c / across, (f * arcLen) / 1.5);
+      // U 0..1 a lo ancho (la huella de neumatico de la textura cae asi sobre los carriles) y V
+      // en metros a la misma escala que el piso de las labores rectas: la rampa se pisa igual.
+      fUv.push(c / across, (f * arcLen) / ESCALA_PISO_V);
     }
   }
   for (let r = 0; r < R - 1; r++) {
@@ -658,4 +693,107 @@ export function createHelicalFloorBerma({
   bermaGeo.computeVertexNormals();
 
   return { floorGeo, bermaGeo };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CARA DE ROCA (TOPE) — el fondo de una labor y la boca no excavada de un cruce
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _caraCache = new Map();
+
+/**
+ * TOPE / FRENTE DE ROCA: la cara con la que muere una excavacion.
+ *
+ * Sustituye a las CHAPAS PLANAS que cerraban estos sitios (`frente_ciego_rocoso`, una
+ * `ShapeGeometry` de 15 triangulos sin espesor; `cierre_csv_*`, una placa del CSV de 27
+ * triangulos, tambien plana). Una lamina plana de 30 m2 no se lee como roca: se lee como un
+ * PANEL puesto delante, y por eso la labor parecia TAPADA en vez de simplemente terminada.
+ *
+ * Un tope real de perforacion y voladura no es plano ni liso:
+ *  - va HUNDIDO hacia la roca, mas hondo en el centro (el arranque/corte quemado avanza primero
+ *    y el contorno se queda atras),
+ *  - la superficie es quebrada, con bolsones de sobre-excavacion,
+ *  - y muere EXACTAMENTE en la herradura de la labor, sin dejar rendija contra los hastiales.
+ *
+ * Topologia de abanico: el anillo exterior son los puntos EXACTOS del perfil de herradura (mas
+ * la solera que lo cierra), y de ahi se interpola hacia un punto central. Asi el borde casa
+ * vertice a vertice con la boca y el sellado esta garantizado por construccion.
+ *
+ * RENDIMIENTO: se cachea por (ancho, alto, arco, litologia, fondo) redondeados, asi que las ~73
+ * caras de la mina comparten un puñado de buffers. ~350 triangulos cada una, contra los 15-27
+ * de la chapa: es geometria barata y ESTATICA que ademas entra en la fusion de estaticos.
+ *
+ * @param {object} o
+ * @param {number} o.width       ancho de la labor (m)
+ * @param {number} o.height      alto de la labor (m)
+ * @param {number} [o.archRatio] fraccion del alto ocupada por el arco
+ * @param {number} [o.depth]     cuanto se hunde el centro del tope hacia la roca (m)
+ * @param {string} [o.rockType]  litologia (rampa de color por vertice)
+ * @returns {THREE.BufferGeometry} en el plano XY, hundiendose hacia -Z (position/uv/color)
+ */
+export function createRockFaceGeo({ width, height, archRatio = 0.40, depth = 0.85, rockType = 'caliza' }) {
+  const key = `cara:${width.toFixed(2)}:${height.toFixed(2)}:${archRatio.toFixed(2)}:${depth.toFixed(2)}:${rockType}`;
+  if (_caraCache.has(key)) return _caraCache.get(key);
+
+  const { profile } = herraduraProfile(width, height, archRatio);
+  const halfW = width / 2;
+
+  // Contorno CERRADO: la herradura + la solera que une sus dos extremos. El perfil arranca en
+  // (+halfW, 0) y termina en (-halfW, 0), asi que la solera vuelve de -halfW a +halfW.
+  const contorno = profile.map((p) => p.clone());
+  const pasosSolera = 5;
+  for (let i = 1; i < pasosSolera; i++) {
+    contorno.push(new THREE.Vector2(-halfW + (2 * halfW * i) / pasosSolera, 0));
+  }
+
+  const N = contorno.length;
+  const M = 6;                                  // anillos del abanico (centro → contorno)
+  const centro = new THREE.Vector2(0, height * 0.44);
+
+  const positions = [], uvs = [], colors = [], indices = [];
+
+  // Anillo 0 = el centro (repetido N veces para que la rejilla sea regular y sin poste).
+  for (let j = 0; j <= M; j++) {
+    const t = j / M;                            // 0 en el centro, 1 en el contorno
+    for (let i = 0; i < N; i++) {
+      const c = contorno[i];
+      // Un pelin PASADO el contorno en el ultimo anillo: solapa con el hastial y mata la
+      // rendija de luz que deja cualquier junta a tope.
+      const escala = j === M ? 1.012 : t;
+      const x = centro.x + (c.x - centro.x) * escala;
+      const y = centro.y + (c.y - centro.y) * escala;
+
+      // Hundimiento: maximo en el eje, cero exacto en el contorno (sella contra la boca).
+      const cuenco = Math.pow(1 - t, 1.5);
+      // Roca QUEBRADA: bolsones amplios + grano de voladura, apagados hacia el borde.
+      const bolson = fbm(x * 0.62 + 7.3, y * 0.58 + 3.1, 4) - 0.5;
+      const grano  = fbm(x * 1.9 + 21.7, y * 1.8 + 13.9, 3) - 0.5;
+      const z = -(depth * cuenco + (bolson * 0.42 + grano * 0.20) * (1 - t * 0.85) * depth);
+
+      positions.push(x, y, z);
+      // UV METRICA, la misma escala que la roca de los hastiales que mueren contra este tope.
+      uvs.push(x / ESCALA_TEXTURA_ROCA, y / ESCALA_TEXTURA_ROCA);
+      const col = rampColor(fbm(x * 0.8 + 3.1, y * 0.7 + 5.7, 4), rockType);
+      colors.push(col.r, col.g, col.b);
+    }
+  }
+
+  for (let j = 0; j < M; j++) {
+    for (let i = 0; i < N; i++) {
+      const i2 = (i + 1) % N;                   // el contorno cierra sobre si mismo
+      const a = j * N + i, b = j * N + i2;
+      const c = (j + 1) * N + i, d = (j + 1) * N + i2;
+      if (j === 0) indices.push(a, c, d);       // el anillo central degenera en abanico
+      else indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  _caraCache.set(key, geo);
+  return geo;
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MineMaterials } from '../../world/materials/MineMaterials.js';
+import { ESCALA_TEXTURA_ROCA } from '../../world/materials/Texturas.js';
 import { crear as crearJumbo } from '../equipos/jumbo.js';
 
 /**
@@ -90,6 +91,12 @@ function _planoRoca(w, h, segsX, segsY, amp, scale, ox, oy, edgeAmp = 0) {
     cols[i * 3 + 2] = col.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  // UV METRICA, igual que la carcasa del tunel y el nicho electrico (ver ESCALA_TEXTURA_ROCA):
+  // la textura de roca va en `repeat(1,1)` y la escala la pone la malla, en metros.
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, (uv.getX(i) * w) / ESCALA_TEXTURA_ROCA, (uv.getY(i) * h) / ESCALA_TEXTURA_ROCA);
+  }
   geo.computeVertexNormals();
   return geo;
 }

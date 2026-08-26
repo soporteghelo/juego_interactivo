@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ANCHO_PASO_INTERSECCION } from './MinePlan.js';
+import { ESCALA_TEXTURA_ROCA } from '../materials/Texturas.js';
 
 export const CSV_INTERSECTION_ORIGIN = Object.freeze({ x: 6000, y: 4500, z: -220 });
 // Anchos ORIGINALES del archivo topografico (m): la envolvente reforzada que forma la via E-W y
@@ -143,7 +144,10 @@ function geometryFromTriangles(triangles, metadata = {}) {
       colors.push(color.r, color.g, color.b);
       // UV por plano dominante. Usar siempre X/Y degeneraba el piso y los hastiales paralelos
       // a X, estirando un solo texel en largas bandas triangulares.
-      const textureScale = 2.4;
+      // La escala es la MISMA que la de las labores (ESCALA_TEXTURA_ROCA): antes coincidia el
+      // divisor pero no el `repeat` de la textura, asi que el grano del cruce salia ~6x mas fino
+      // que el de la galeria que entraba en el.
+      const textureScale = ESCALA_TEXTURA_ROCA;
       if (ay >= ax && ay >= az) uvs.push(point.x / textureScale, point.z / textureScale);
       else if (ax >= az) uvs.push(point.z / textureScale, point.y / textureScale);
       else uvs.push(point.x / textureScale, point.y / textureScale);

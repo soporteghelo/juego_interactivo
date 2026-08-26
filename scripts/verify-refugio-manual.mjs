@@ -66,13 +66,23 @@ assert.ok(cEsc.x < 0, `La escotilla debe ir al FONDO del refugio (x=${cEsc.x.toF
 // Sobre la banca: el ocupante sentado debajo es quien la abre.
 assert.ok(cEsc.y > 1.1 && cEsc.y < 2.0, `Altura impropia para salir desde la banca (y=${cEsc.y.toFixed(2)})`);
 
-// El rótulo se lee DESDE DENTRO: es la cara que mira el ocupante que va a escapar.
-let rotulo = null;
-escotilla.traverse(o => { if (o.isMesh && o.geometry?.type === 'PlaneGeometry') rotulo = o; });
-assert.ok(rotulo, 'La escotilla debe llevar su rótulo de vía de escape');
-const normal = new THREE.Vector3(0, 0, 1)
-  .applyQuaternion(rotulo.getWorldQuaternion(new THREE.Quaternion()));
-assert.ok(normal.z < 0, 'El rótulo de la escotilla mira hacia fuera: no se leería desde dentro');
+// La escotilla se rotula por sus DOS caras, y cada una mira a su lado:
+//   · INTERIOR  → la placa de instrucción que lee el ocupante que va a escapar (mira a -Z).
+//   · EXTERIOR  → el marco "SALIDA DE EMERGENCIA" que ve el minero desde la labor (mira a +Z).
+// Antes esto se comprobaba quedándose con el ÚLTIMO PlaneGeometry del subelemento, así que al
+// añadir la cara exterior el test pasó a medir el rótulo equivocado. Ahora se separan por nombre.
+const planos = [];
+escotilla.traverse(o => { if (o.isMesh && o.geometry?.type === 'PlaneGeometry') planos.push(o); });
+const normalDe = (o) => new THREE.Vector3(0, 0, 1)
+  .applyQuaternion(o.getWorldQuaternion(new THREE.Quaternion()));
+
+const rotuloExt = planos.find(o => o.name === 'rotulo_salida_emergencia_ext');
+assert.ok(rotuloExt, 'Falta la rotulación EXTERIOR de la escotilla: desde la labor no se ve la vía de escape');
+assert.ok(normalDe(rotuloExt).z > 0, 'La rotulación exterior de la escotilla no mira a la mina');
+
+const rotuloInt = planos.filter(o => o !== rotuloExt).pop();
+assert.ok(rotuloInt, 'La escotilla debe llevar su rótulo de vía de escape');
+assert.ok(normalDe(rotuloInt).z < 0, 'El rótulo interior de la escotilla mira hacia fuera: no se leería desde dentro');
 
 // Las válvulas van altas, en el arranque de la bóveda.
 const cVal = caja(valvulas);

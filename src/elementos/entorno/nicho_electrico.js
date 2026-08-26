@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MineMaterials } from '../../world/materials/MineMaterials.js';
+import { ESCALA_TEXTURA_ROCA } from '../../world/materials/Texturas.js';
 import { crear as crearTablero } from '../senal/tablero_electrico.js';
 import { sub } from '../_comun/subelemento.js';
 
@@ -174,6 +175,13 @@ function planoRocaTerrain(w, h, segsX = 24, segsY = 20, amp = 0.18, scale = 2.8,
   }
 
   geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  // UV METRICA: la roca de labor se tiletea en baldosas de ESCALA_TEXTURA_ROCA (la textura va en
+  // `repeat(1,1)`), asi que el nicho debe medir su UV en metros como la carcasa del tunel. Con la
+  // UV 0..1 de PlaneGeometry el grano cambiaria de tamaño segun lo grande que fuera el nicho.
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, (uv.getX(i) * w) / ESCALA_TEXTURA_ROCA, (uv.getY(i) * h) / ESCALA_TEXTURA_ROCA);
+  }
   geo.computeVertexNormals();
   _terrainCache.set(key, geo);
   return geo;

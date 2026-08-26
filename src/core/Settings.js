@@ -36,6 +36,12 @@ export const QUALITY_PRESETS = {
     // (contacto oscuro). SOLO en 'alto' (desktop con margen); demasiado caro para GPU
     // integrada/movil, donde el claroscuro ya lo dan la niebla y las luces puntuales.
     ao: true,
+    // HACES DE LUZ VISIBLES (conos de polvo/vaho, ver lighting/haz_luz.js). `hazLuz` es el del
+    // headlamp; `hazLuzFijas` los de bombillas y luminarias. Se separan porque el del jugador es
+    // UNO y vale la pena casi siempre, mientras que los fijos se multiplican por cada fuente
+    // visible y su coste es fill-rate aditivo — lo que peor lleva una GPU movil.
+    hazLuz: true,
+    hazLuzFijas: true,
     particleDensity: 1.0,
     drawDistance: 70,       // niebla: fondo perdido lejos
     fogNear: 14,
@@ -59,6 +65,8 @@ export const QUALITY_PRESETS = {
     grain: false,
     vignette: true,
     ao: false,
+    hazLuz: true,
+    hazLuzFijas: true,
     particleDensity: 0.6,
     drawDistance: 55,
     fogNear: 12,
@@ -86,6 +94,12 @@ export const QUALITY_PRESETS = {
     grain: false,
     vignette: false,
     ao: false,
+    // El haz del HEADLAMP se mantiene en celular: es UN cono, y sin postprocesado ni niebla
+    // volumetrica es lo unico que da lectura del espacio en la oscuridad (y compensa la perdida
+    // del bloom). Los haces FIJOS si se apagan: se multiplican por fuente visible y el overdraw
+    // aditivo es justo lo que hunde una GPU movil de render por tiles.
+    hazLuz: true,
+    hazLuzFijas: false,
     // Polvo minimo; la niebla volumetrica (MistSystem) se desactiva en tactil por overdraw.
     particleDensity: 0.3,
     drawDistance: 36,
@@ -108,6 +122,8 @@ export const QUALITY_PRESETS = {
     grain: false,
     vignette: false,
     ao: false,
+    hazLuz: false,
+    hazLuzFijas: false,
     particleDensity: 0.15,
     drawDistance: 30,
     fogNear: 8,

@@ -198,22 +198,97 @@ function _aTextura(canvas, repeatX = 1, repeatY = 1) {
   return t;
 }
 
-/** Franjas diagonales NARANJA/blanco (cinta reflectiva, foto real). Se repite a lo largo. */
-function _texturaRayas() {
+/**
+ * Franjas diagonales de cinta reflectiva. Se repite a lo largo.
+ *
+ * El refugio lleva DOS cintas distintas y no son del mismo color:
+ *   · zócalo y esquinas verticales → NARANJA (el histórico, de las fotos de frente),
+ *   · canto SUPERIOR del contenedor → ROJO (foto del costado: la línea del techo).
+ * Por eso el color es parámetro en vez de estar fijo.
+ */
+function _texturaRayas(color = '#e05a12') {
   const { canvas, ctx } = _lienzo(128, 128);
   ctx.fillStyle = '#f2f2ee'; ctx.fillRect(0, 0, 128, 128);
-  ctx.fillStyle = '#e05a12';
+  ctx.fillStyle = color;
   ctx.lineWidth = 0;
-  // franjas a 45°
-  for (let i = -128; i < 256; i += 64) {
+  // Franjas a 45°. El ANCHO de cada banda tiene que ser la MITAD del paso: con ancho 64 y paso
+  // 64 las bandas se tocan borde con borde, cubren el lienzo entero y el blanco del fondo no
+  // asoma nunca — la cinta salia de un color macizo. Lo que parecian franjas en el refugio eran
+  // en realidad las juntas de los paneles del casco.
+  const paso = 64, ancho = paso / 2;
+  for (let i = -128; i < 256 + paso; i += paso) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
-    ctx.lineTo(i + 64, 0);
-    ctx.lineTo(i + 64 - 128, 128);
+    ctx.lineTo(i + ancho, 0);
+    ctx.lineTo(i + ancho - 128, 128);
     ctx.lineTo(i - 128, 128);
     ctx.closePath();
     ctx.fill();
   }
+  return canvas;
+}
+
+/**
+ * ROTULACIÓN EXTERIOR DE LA SALIDA DE EMERGENCIA (foto real, costado del refugio N°2).
+ *
+ * Desde la mina, la escotilla de escape NO se ve como una tapa: se ve como un MARCO NEGRO
+ * grueso de esquinas muy redondeadas pintado sobre el panel crema, con el texto apilado
+ * SALIDA / DE / EMERGENCIA dentro, y debajo —cruzando el propio marco— el número de refugio
+ * ROTULADO A MANO con brocha, torcido y de trazo irregular.
+ *
+ * Ese rótulo a mano es justo lo que delata que es una instalación real y no una calcomanía de
+ * catálogo, así que se dibuja letra a letra con desviación propia (PRNG fijo → siempre igual).
+ *
+ * Fondo TRANSPARENTE: es pintura sobre la chapa, no una placa atornillada.
+ */
+function _texturaSalidaEmergenciaExt(numero = 2) {
+  const W = 620, Hc = 560;
+  const { canvas, ctx } = _lienzo(W, Hc);
+  ctx.clearRect(0, 0, W, Hc);
+
+  // ── Marco negro de esquinas muy redondeadas ──
+  const x0 = 95, y0c = 14, w = 430, h = 430, r = 98;
+  ctx.strokeStyle = '#141414';
+  ctx.lineWidth = 27;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x0 + r, y0c);
+  ctx.lineTo(x0 + w - r, y0c);          ctx.quadraticCurveTo(x0 + w, y0c, x0 + w, y0c + r);
+  ctx.lineTo(x0 + w, y0c + h - r);      ctx.quadraticCurveTo(x0 + w, y0c + h, x0 + w - r, y0c + h);
+  ctx.lineTo(x0 + r, y0c + h);          ctx.quadraticCurveTo(x0, y0c + h, x0, y0c + h - r);
+  ctx.lineTo(x0, y0c + r);              ctx.quadraticCurveTo(x0, y0c, x0 + r, y0c);
+  ctx.closePath();
+  ctx.stroke();
+
+  // ── Texto apilado, centrado, en negro ──
+  ctx.fillStyle = '#141414';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 78px Arial, sans-serif';  ctx.fillText('SALIDA', W / 2, 118);
+  ctx.font = 'bold 78px Arial, sans-serif';  ctx.fillText('DE', W / 2, 236);
+  // EMERGENCIA es la palabra larga: va mas pequeña para no desbordar el marco, igual que en la foto.
+  ctx.font = 'bold 52px Arial, sans-serif';  ctx.fillText('EMERGENCIA', W / 2, 352);
+
+  // ── "REFUGIO MINERO N° 02" A MANO, cruzando el borde inferior del marco ──
+  // PRNG fijo (LCG): el trazo sale torcido pero SIEMPRE igual, sin parpadeos entre cargas.
+  let semilla = 0x5A11DA >>> 0;
+  const rnd = () => ((semilla = (semilla * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const texto = `REFUGIO MINERO N° ${String(numero).padStart(2, '0')}`;
+  ctx.textAlign = 'left';
+  ctx.font = 'italic bold 48px Arial, sans-serif';
+  let x = 52;
+  const yBase = 470;
+  for (const ch of texto) {
+    const ancho = ctx.measureText(ch).width;
+    ctx.save();
+    // Cada letra con su propio desvío: la línea sube un poco hacia la derecha, como la de la foto.
+    ctx.translate(x + ancho / 2, yBase - (x - 52) * 0.05 + (rnd() - 0.5) * 8);
+    ctx.rotate((rnd() - 0.5) * 0.12);
+    ctx.fillText(ch, -ancho / 2, 0);
+    ctx.restore();
+    x += ancho + (rnd() - 0.4) * 3;
+  }
+
   return canvas;
 }
 
@@ -2438,8 +2513,8 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   //  FRANJAS REFLECTIVAS ROJO/BLANCO (zócalo + esquinas)
   // ════════════════════════════════════════════════════════════════
   S = sub(g, 'franjas_logos', 'Franjas reflectivas y logos Dräger', 'Cinta reflectiva naranja/blanco en zócalo y esquinas + logos "Dräger".');
-  const matRayasZ = new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRayas(), L / 0.5, 1), roughness: 0.4, metalness: 0.2 });
-  const matRayasX = new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRayas(), A / 0.5, 1), roughness: 0.4, metalness: 0.2 });
+  const matRayasZ = new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRayas(), L / 0.44, 1), roughness: 0.4, metalness: 0.2 });
+  const matRayasX = new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRayas(), A / 0.44, 1), roughness: 0.4, metalness: 0.2 });
   const matRayasV = new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRayas(), 1, 4), roughness: 0.4, metalness: 0.2 });
   const zocaloH = 0.22;
   // zócalos longitudinales
@@ -2460,6 +2535,29 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     fv.position.set(sx * (L / 2 + t / 2 + 0.006), y0 + (H - 0.1) / 2 + 0.05, sz * (A / 2 - 0.12));
     fv.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
     S.add(fv);
+  }
+
+  // ── CINTA ROJA/BLANCA DEL CANTO SUPERIOR ─────────────────────────
+  //  Foto del costado en mina: además de la cinta naranja del zócalo, el contenedor lleva otra
+  //  franja diagonal —ROJA, no naranja— corrida por la LÍNEA DEL TECHO, en las cuatro caras.
+  //  Es la que marca el gálibo superior del refugio para el equipo pesado que circula por la
+  //  labor, y desde la mina es lo primero que se ve del refugio: la cinta del zócalo queda
+  //  tapada por el barro y las cunetas, ésta no.
+  const bandaSupH = 0.16;
+  const yBandaSup = y0 + H - bandaSupH / 2 - 0.02;
+  const matRojaZ = new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRayas('#c31f1a'), L / 0.50, 1), roughness: 0.4, metalness: 0.2 });
+  const matRojaX = new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRayas('#c31f1a'), A / 0.50, 1), roughness: 0.4, metalness: 0.2 });
+  for (const sz of [-1, 1]) {
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(L, bandaSupH), matRojaZ);
+    b.position.set(0, yBandaSup, sz * (A / 2 + t / 2 + 0.007));
+    b.rotation.y = sz > 0 ? 0 : Math.PI;
+    S.add(b);
+  }
+  for (const sx of [-1, 1]) {
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(A, bandaSupH), matRojaX);
+    b.position.set(sx * (L / 2 + t / 2 + 0.007), yBandaSup, 0);
+    b.rotation.y = sx > 0 ? Math.PI / 2 : -Math.PI / 2;
+    S.add(b);
   }
 
   // ── Logo "Dräger" en el costado +Z ───────────────────────────────
@@ -4416,6 +4514,29 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     rot.position.set(xEsc, yEsc + escH / 2 + 0.14, zPared - 0.004);
     rot.rotation.y = Math.PI;                       // se lee DESDE DENTRO
     S.add(rot);
+
+    // ── ROTULACIÓN EXTERIOR, la cara que ve la mina ──────────────────────────
+    //  Hasta ahora la escotilla solo existía por DENTRO (hoja, pomos, bisagras y la placa de
+    //  instrucción, que además va girada π para leerse desde la cámara). Desde la labor, el
+    //  costado del refugio se veía como un panel crema liso con el logo Dräger y nada más.
+    //
+    //  En la foto real es justo al revés: lo que domina ese costado es el MARCO NEGRO de
+    //  esquinas muy redondeadas con SALIDA / DE / EMERGENCIA, y debajo el número de refugio
+    //  rotulado a mano. Sin eso, un minero que llega por la labor no tiene forma de saber que
+    //  ahí hay una vía de escape — que es exactamente para lo que está pintado.
+    const lienzoExt = _texturaSalidaEmergenciaExt(numero);
+    const anchoExt = 1.38;
+    const extRot = new THREE.Mesh(
+      new THREE.PlaneGeometry(anchoExt, anchoExt * (lienzoExt.height / lienzoExt.width)),
+      new THREE.MeshStandardMaterial({
+        map: _aTextura(lienzoExt), transparent: true, roughness: 0.78, metalness: 0.05
+      })
+    );
+    // Sobre la chapa del costado +Z (la misma cara que lleva el logo), centrado en la escotilla
+    // y bajado un poco: el rótulo a mano cae por debajo del marco, como en la foto.
+    extRot.position.set(xEsc, yEsc - 0.05, A / 2 + t / 2 + 0.008);
+    extRot.name = 'rotulo_salida_emergencia_ext';
+    S.add(extRot);
   }
 
   // ── VÁLVULAS DE SOBREPRESIÓN ─────────────────────────────────────

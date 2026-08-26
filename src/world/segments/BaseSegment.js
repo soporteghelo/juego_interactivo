@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createTunnelShell, createWireframeLaborShell } from './TunnelGeometry.js';
 import { MineMaterials } from '../materials/MineMaterials.js';
+import { ESCALA_PISO_V } from '../materials/Texturas.js';
 import { Settings } from '../../core/Settings.js';
 
 /**
@@ -128,6 +129,52 @@ export class BaseSegment {
   }
 
   /**
+   * PARCHE de shotcrete con ESPESOR: disco de contorno irregular que se abomba hacia la labor y
+   * muere en el borde, en vez de un poligono plano.
+   *
+   * El shotcrete se proyecta en capas de 3-6 cm y deja un canto visible y un reborde de rebote;
+   * el parche anterior era una `CircleGeometry` de 7 lados desplazada 6 cm — o sea, literalmente
+   * una calcomania heptagonal pegada a la roca, que es el anti-patron que la referencia prohibe
+   * ("shotcrete con espesor y textura spray, no calcomanias planas").
+   *
+   * Geometria: abanico de un anillo exterior (z=0, al ras de la roca) hacia un centro adelantado
+   * `espesor` hacia la labor, con el radio perturbado por vertice. ~2x18 triangulos por parche,
+   * y siguen fusionandose todos en UNA malla, asi que no cambia el conteo de llamadas de dibujo.
+   *
+   * @param {()=>number} rnd  PRNG del tramo (reproducible por semilla)
+   */
+  _parcheShotcreteGeo(radio, espesor, rnd) {
+    const N = 18;
+    const pos = [], uv = [], idx = [];
+    // Vertice 0 = centro, adelantado hacia la labor (el bulbo de material proyectado).
+    pos.push(0, 0, espesor);
+    uv.push(0.5, 0.5);
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      // Contorno IRREGULAR: el chorro no dibuja circulos, y el rebote deja lengüetas.
+      const r = radio * (0.68 + rnd() * 0.5);
+      pos.push(Math.cos(a) * r, Math.sin(a) * r, 0);
+      uv.push(0.5 + Math.cos(a) * 0.5, 0.5 + Math.sin(a) * 0.5);
+      // Anillo intermedio: da el HOMBRO del parche (el canto de 3-6 cm que se ve en rasante).
+      const r2 = r * 0.55;
+      pos.push(Math.cos(a) * r2, Math.sin(a) * r2, espesor * 0.82);
+      uv.push(0.5 + Math.cos(a) * 0.275, 0.5 + Math.sin(a) * 0.275);
+    }
+    for (let i = 0; i < N; i++) {
+      const b0 = 1 + i * 2, m0 = b0 + 1;
+      const b1 = 1 + ((i + 1) % N) * 2, m1 = b1 + 1;
+      idx.push(b0, m0, b1,  b1, m0, m1);   // faldon: borde → hombro
+      idx.push(m0, 0, m1);                 // cupula: hombro → centro
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  /**
    * Parches irregulares de hormigon proyectado (shotcrete) sobre la roca oscura.
    *
    * Los 5-11 parches del tramo se FUSIONAN en una sola malla: comparten material y no se mueven,
@@ -156,10 +203,12 @@ export class BaseSegment {
       molde.scale.set(this.rng.range(0.5, 2.2), this.rng.range(0.4, 1.6), 1);
       molde.rotation.set(0, 0, 0);
       molde.lookAt(new THREE.Vector3(0, wallTop * 0.5, z));
-      molde.translateZ(0.06); // ligeramente hacia el interior para evitar z-fighting
+      molde.translateZ(0.02); // arranca al ras de la roca; el espesor lo pone la propia geometria
       molde.updateMatrix();
 
-      const geo = new THREE.CircleGeometry(r, 7);
+      // Capa proyectada de 3-6 cm (D.S. 024-2016-EM: el shotcrete de sostenimiento va de 2" en
+      // adelante; aqui es la capa de sellado, la mas delgada).
+      const geo = this._parcheShotcreteGeo(r, this.rng.range(0.03, 0.06), () => this.rng.next());
       geo.applyMatrix4(molde.matrix);
       geos.push(geo);
     }
@@ -229,6 +278,15 @@ export class BaseSegment {
       pos.setZ(i, h);
     }
     floorGeo.computeVertexNormals();
+
+    // UV del piso: U se deja 0..1 EXACTO a lo ancho de la labor —de ahi cuelga que la HUELLA DE
+    // NEUMATICO horneada en la textura (carriles a U=0.30 y U=0.70) caiga justo sobre los surcos
+    // que se acaban de tallar en la malla (x = ±0.2·ancho)— y V pasa a METROS, para que el barro
+    // no se estire mas en un tramo largo que en uno corto.
+    const uvPiso = floorGeo.attributes.uv;
+    for (let i = 0; i < uvPiso.count; i++) {
+      uvPiso.setY(i, uvPiso.getY(i) * (this.length / ESCALA_PISO_V));
+    }
 
     const floor = new THREE.Mesh(floorGeo, MineMaterials.barroMojado());
     floor.rotation.x = -Math.PI / 2;

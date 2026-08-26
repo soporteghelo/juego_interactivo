@@ -5,7 +5,9 @@ import { Settings } from '../../core/Settings.js';
 import { crear as crearEspejoConvexo } from '../../elementos/ssoma/espejo_convexo.js';
 import { getCsvIntersectionAsset } from './CsvIntersectionAsset.js';
 import { CSV_INTERSECTION_HEIGHT, CSV_INTERSECTION_WIDTH } from './CsvIntersectionGeometry.js';
-import { createMouthCollarGeo } from '../segments/TunnelGeometry.js';
+import { createMouthCollarGeo, createRockFaceGeo } from '../segments/TunnelGeometry.js';
+import { ESCALA_TEXTURA_ROCA } from '../materials/Texturas.js';
+import { crearHaz, hayHaz } from '../../lighting/haz_luz.js';
 
 const DIRECTIONS = [
   { key: 'E', x: 1, z: 0, axisX: true },
@@ -65,6 +67,15 @@ function backdropGeometry(size, height, passWidth) {
 
   const geo = mergeGeometries(piezas);
   for (const p of piezas) p.dispose();
+  // Las UV de BoxGeometry van 0..1 POR CARA, asi que con la textura de roca en `repeat(1,1)` una
+  // baldosa se estiraria sobre los ~10 m del panel. Se escalan a la densidad metrica del resto de
+  // la mina (ESCALA_TEXTURA_ROCA). Es aproximado a proposito: el respaldo solo asoma por donde la
+  // malla del CSV deja hueco, y no merece UV por cara.
+  const uvRespaldo = geo.attributes.uv;
+  const escala = size / ESCALA_TEXTURA_ROCA;
+  for (let i = 0; i < uvRespaldo.count; i++) {
+    uvRespaldo.setXY(i, uvRespaldo.getX(i) * escala, uvRespaldo.getY(i) * escala);
+  }
   // `rocaTunel` pinta con color por vertice: sin el atributo, el respaldo saldria NEGRO (que es
   // justo lo que se quiere evitar). Tono de roca en sombra, un punto mas oscuro que la piel.
   const colores = new Float32Array(geo.attributes.position.count * 3);
@@ -115,7 +126,7 @@ export class CsvIntersectionSegment {
   _isOpen(direction) { return this.openDirs.some(d => d.x * direction.x + d.z * direction.z > 0.7); }
 
   build() {
-    const { geometry, capGeometries, metadata } = getCsvIntersectionAsset();
+    const { geometry, metadata } = getCsvIntersectionAsset();
     const material = rockMaterial();
 
     // Respaldo PRIMERO: queda por detras de la piel del CSV y cierra el volumen del cruce.
@@ -134,7 +145,7 @@ export class CsvIntersectionSegment {
     this.group.add(shell);
     this.shell = shell;
 
-    this._buildCollidersAndCaps(capGeometries, material);
+    this._buildCollidersAndCaps(material);
     this._buildMouthCollars(material);
     this._buildLighting();
     this._buildSafetyDetail();
@@ -179,7 +190,7 @@ export class CsvIntersectionSegment {
     }
   }
 
-  _buildCollidersAndCaps(capGeometries, material) {
+  _buildCollidersAndCaps(material) {
     const half = this.size / 2;
     const H = this.height;
     // Piso y corona continuos. Las cuatro cajas de esquina dejan libre la cruz del CSV: ambas
@@ -199,12 +210,31 @@ export class CsvIntersectionSegment {
       });
     }
 
-    // Si el nodo es T, codo o extremo, la boca inexistente se tapa con la cara exacta extraida
-    // del mismo CSV (BOCA_REFORZADA para E/W; PORTAL/FRENTE para N/S).
+    // Si el nodo es T, codo o extremo, esa direccion NO esta excavada: lo que hay al final del
+    // brazo del cruce es roca virgen, o sea un TOPE.
+    //
+    // Antes se tapaba con la cara plana extraida del CSV (capas BOCA_REFORZADA / PORTAL / FRENTE):
+    // una placa de 27 triangulos y espesor CERO, de ~34 m2. Con ~53 de estas repartidas por la
+    // mina, cada cruce en T o en codo enseñaba un panel liso cerrando el paso, y la labor parecia
+    // TAPADA en vez de simplemente terminada. Ahora va la misma cara de roca hundida y quebrada
+    // que cierra las labores terminales, a la seccion de la boca del cruce.
     for (const direction of DIRECTIONS) {
       if (this._isOpen(direction)) continue;
-      const cap = new THREE.Mesh(capGeometries[direction.key], material);
+      const cap = new THREE.Mesh(createRockFaceGeo({
+        width: CSV_INTERSECTION_WIDTH,
+        height: this.height,
+        // El cruce se excava con la misma herradura que las labores que lo alimentan.
+        archRatio: 0.40,
+        // Un poco menos hondo que el tope de una labor: aqui el brazo del cruce se quedo corto,
+        // no es un frente de avance activo.
+        depth: 0.65
+      }), material);
       cap.name = `cierre_csv_${direction.key}`;
+      // La cara nace en el plano XY hundiendose hacia -Z local; se gira para que -Z apunte HACIA
+      // AFUERA del bloque (la misma convencion que usan los collares de boca).
+      cap.rotation.y = Math.atan2(-direction.x, -direction.z);
+      cap.position.set(direction.x * half, 0, direction.z * half);
+      cap.receiveShadow = true;
       this.group.add(cap);
       const passageHalf = direction.axisX ? clearZ : clearX;
       if (direction.axisX) {
@@ -227,6 +257,22 @@ export class CsvIntersectionSegment {
     panel.position.set(0, y - 0.09, 0);
     panel.name = 'node_luz';
     this.group.add(panel);
+
+    // HAZ VOLUMETRICO de la luminaria del cruce. Es el sitio donde mas se nota: el jugador llega
+    // por una labor a oscuras y ve la campana de polvo colgando sobre la interseccion antes de
+    // llegar. UNO por nodo (los nodos son escasos), gateado por `hazLuzFijas`.
+    if (hayHaz(true)) {
+      const haz = crearHaz({
+        angulo: Math.PI / 3.1,
+        alcance: this.height + 0.6,
+        color: 0xf5f8ff,
+        intensidad: 0.07
+      });
+      haz.rotation.x = -Math.PI / 2;
+      haz.position.set(0, y - 0.12, 0);
+      this.group.add(haz);
+    }
+
     if (this.lighting?.canAddLight?.()) {
       const light = new THREE.PointLight(0xf5f8ff, 30, 20, 2);
       light.position.set(0, y - 0.30, 0);
