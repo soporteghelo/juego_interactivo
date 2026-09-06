@@ -17,9 +17,11 @@ import { sub } from '../_comun/subelemento.js';
  *  INTERIOR ─ Anatomía según diagrama Dräger (5 zonas):
  *   1. PRECÁMARA (esclusa): área de transición tras la puerta exterior, separada de
  *      la cámara principal por un mamparo con segunda puerta estanca (ojo de buey).
- *   2. UnidadREFUGE® "Dräger | SIMSA": central purificadora azul — pantalla, paro de
- *      emergencia rojo y botón verde. Recircula el aire por cal sodada Drägersorb® 400
- *      (CO2), ChamberCatalysis® (CO) y sílice gel (humedad), un ventilador por contenedor.
+ *   2. UnidadREFUGE® "Dräger | SIMSA": central purificadora azul — controlador con LCD
+ *      magenta, selectores de iluminación y sirena, monitor de baterías y los pilotos de
+ *      alimentación "Línea"/"Respaldo"; encima, las dos tolvas rotuladas de carga.
+ *      Recircula el aire por cal sodada Drägersorb® 400 (CO2), ChamberCatalysis® (CO) y
+ *      sílice gel (humedad), un ventilador por contenedor.
  *   3. BANCO DE BATERÍAS: estantería al fondo con cajas de baterías (energía
  *      ininterrumpida para iluminación y A/C).
  *   4. CILINDROS DE O2: blancos (correa naranja), azules Dräger junto a la unidad y
@@ -115,7 +117,9 @@ export const recorrido = {
         'El corazón del refugio. Sus ventiladores recirculan la atmósfera de la cámara por tres ' +
         'contenedores: cal sodada Drägersorb® 400 absorbe el CO2, ChamberCatalysis® cataliza el ' +
         'CO y el sílice gel retira la humedad. El aire limpio vuelve por las dos salidas del ' +
-        'frente. Cada carga de Drägersorb rinde 5 h, una hora menos por cada 5 ocupantes de más.'
+        'frente. Cada carga de Drägersorb rinde 5 h, una hora menos por cada 5 ocupantes de más. ' +
+        'En el frente, el controlador canta el estado de los dos ventiladores y los pilotos dicen ' +
+        'de qué está comiendo la unidad: verde LÍNEA es red de mina, rojo RESPALDO es batería.'
     },
     {
       sub: 'cilindros_o2', yaw: 18, pitch: 4, dist: 1.05, dur: 7,
@@ -521,36 +525,185 @@ function _texturaSalidaEmergencia() {
 }
 
 /**
- * Cara del PANEL DE CONTROL de la UnidadREFUGE® (manual p.20): panel blanco con
- * indicadores verdes/rojos, dial y diagrama de flujo del sistema.
+ * CARÁTULA DEL CONTROLADOR "Dräger | SIMSA" de la UnidadREFUGE® (fotos de cerca del frente).
+ *
+ * Módulo empotrado de 144 × 96 mm —formato DIN de instrumento de tablero— con marco bronce,
+ * cabecera "Dräger | SIMSA", LCD RETROILUMINADO EN MAGENTA con texto matricial rojo oscuro y
+ * cuatro teclas de membrana.
+ *
+ * Lo que muestra la pantalla es LO DE LA FOTO, no un relleno decorativo:
+ *   · el modelo MRC5000, el mismo de la placa de identificación del refugio;
+ *   · el reloj SIN PONER EN HORA — «2020-03-01 Su 00.00»: fecha de fábrica (que efectivamente
+ *     cayó domingo) y las 00.00. Un refugio que lleva años en la labor con el reloj del
+ *     controlador sin ajustar es exactamente lo que se encuentra en mina;
+ *   · «V1 OFF   V2 OFF», los DOS ventiladores parados. La UnidadREFUGE® no recircula sola: se
+ *     arranca al encerrarse, así que en espera sus dos ventiladores están apagados. Que la
+ *     pantalla lo cante es dato operacional, no adorno.
+ *
+ * Antes esta cara era un panel blanco inventado —pilotos de colores y un diagrama de flujo—
+ * que no existe en el equipo real.
  */
-function _texturaPanelUnidadRefuge() {
-  const { canvas, ctx } = _lienzo(360, 240);
-  ctx.fillStyle = '#f2f2ec'; ctx.fillRect(0, 0, 360, 240);
-  ctx.strokeStyle = '#9a9a92'; ctx.lineWidth = 4; ctx.strokeRect(4, 4, 352, 232);
-  // título
-  ctx.fillStyle = '#12307e'; ctx.font = 'bold 20px Arial, sans-serif'; ctx.textAlign = 'left';
-  ctx.fillText('Dräger', 16, 30);
-  ctx.fillStyle = '#333'; ctx.font = 'bold 13px Arial, sans-serif';
-  ctx.fillText('UnidadREFUGE®', 92, 30);
-  // indicadores (2 filas de pilotos verdes/rojos/ámbar)
-  const cols = ['#1db93c', '#1db93c', '#d21f1f', '#1db93c', '#d8a11a', '#1db93c'];
-  for (let i = 0; i < 6; i++) {
-    ctx.fillStyle = cols[i];
-    ctx.beginPath();
-    ctx.arc(36 + (i % 3) * 44, 78 + Math.floor(i / 3) * 44, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.stroke();
+function _texturaControladorSIMSA() {
+  const W = 576, Hh = 384;
+  const { canvas, ctx } = _lienzo(W, Hh);
+  ctx.fillStyle = '#5d4c3c'; ctx.fillRect(0, 0, W, Hh);             // marco del empotramiento
+  ctx.fillStyle = '#f1efe8'; ctx.fillRect(20, 20, W - 40, Hh - 40); // carátula crema
+
+  // Cabecera "Dräger | SIMSA", centrada como en la foto.
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 40px Arial, sans-serif';
+  const anchoD = ctx.measureText('Dräger').width;
+  const xCab = W / 2 - (anchoD + 130) / 2;
+  ctx.fillStyle = '#16327c';
+  ctx.fillText('Dräger', xCab, 60);
+  ctx.fillStyle = '#8d8b85';
+  ctx.fillRect(xCab + anchoD + 24, 38, 4, 44);
+  ctx.fillStyle = '#26272a';
+  ctx.font = '38px Arial, sans-serif';
+  ctx.fillText('SIMSA', xCab + anchoD + 48, 60);
+
+  // LCD: filete negro, fondo magenta de la retroiluminación y matriz en rojo oscuro.
+  ctx.fillStyle = '#15151a'; ctx.fillRect(81, 81, 415, 181);
+  ctx.fillStyle = '#ec2f63'; ctx.fillRect(87, 87, 403, 169);
+  ctx.fillStyle = '#7c0d2c';
+  ctx.font = 'bold 30px "Courier New", monospace';
+  ctx.fillText('UNIDAD PURIFICADORA', 100, 106);
+  ctx.fillText('DE AIRE MRC5000', 100, 136);
+  ctx.fillText('2020-03-01 Su 00.00', 100, 166);
+  ctx.fillText('V1 OFF      V2 OFF', 100, 222);
+
+  // Cuatro teclas de membrana: Test · libre · luz del WC · silenciar alarma.
+  const TECLA_W = 70, TECLA_H = 56, TECLA_Y = 292;
+  [89, 168, 247, 326].forEach((tx, i) => {
+    ctx.strokeStyle = '#5a5ba8'; ctx.lineWidth = 3;
+    ctx.strokeRect(tx, TECLA_Y, TECLA_W, TECLA_H);
+    const cx = tx + TECLA_W / 2;
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = '#3a3a46'; ctx.fillStyle = '#3a3a46'; ctx.lineWidth = 2;
+    if (i === 0) {
+      ctx.font = '22px Arial, sans-serif';
+      ctx.fillText('Test', cx, TECLA_Y + 30);
+    } else if (i === 2) {
+      // Lamparita sobre las siglas: es la luz del cubículo del baño químico.
+      ctx.beginPath(); ctx.arc(cx, TECLA_Y + 18, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - 5, TECLA_Y + 28); ctx.lineTo(cx + 5, TECLA_Y + 28); ctx.stroke();
+      ctx.font = '17px Arial, sans-serif';
+      ctx.fillText('WC', cx, TECLA_Y + 44);
+    } else if (i === 3) {
+      // Campana tachada: silenciar la sirena sin cancelar la alarma.
+      ctx.beginPath();
+      ctx.moveTo(cx - 11, TECLA_Y + 34); ctx.lineTo(cx + 11, TECLA_Y + 34);
+      ctx.lineTo(cx + 8, TECLA_Y + 28); ctx.lineTo(cx + 8, TECLA_Y + 19);
+      ctx.arc(cx, TECLA_Y + 19, 8, 0, Math.PI, true);
+      ctx.lineTo(cx - 8, TECLA_Y + 28); ctx.closePath(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 15, TECLA_Y + 40); ctx.lineTo(cx + 15, TECLA_Y + 8); ctx.stroke();
+    }
+    ctx.textAlign = 'left';
+  });
+  return canvas;
+}
+
+/**
+ * CARÁTULA DEL MONITOR DE BATERÍAS del frente de la UnidadREFUGE® (foto de cerca): un
+ * BMV-702 "victron energy" embutido en placa de aluminio cepillado, entre el piloto de
+ * respaldo y el de línea.
+ *
+ * Va en el FRENTE y no dentro del gabinete de baterías a propósito: es el instrumento que
+ * dice cuánta autonomía le queda al refugio, y quien está encerrado tiene que poder leerlo
+ * sin abrir nada. En la foto marca 0.00 — el refugio está en línea y el banco no se descarga.
+ */
+function _texturaMonitorBateria() {
+  const S = 320;
+  const { canvas, ctx } = _lienzo(S, S);
+  ctx.fillStyle = '#b6b4ad'; ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 150; i++) {                       // veteado del aluminio cepillado
+    ctx.strokeStyle = `rgba(255,255,255,${(0.03 + Math.random() * 0.07).toFixed(3)})`;
+    ctx.lineWidth = 1;
+    const y = Math.random() * S;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S, y); ctx.stroke();
   }
-  // diagrama de flujo (derecha)
-  ctx.strokeStyle = '#333'; ctx.lineWidth = 3;
-  ctx.strokeRect(190, 56, 152, 156);
-  ctx.beginPath(); ctx.arc(230, 108, 22, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(302, 162, 18, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(252, 108); ctx.lineTo(302, 108); ctx.lineTo(302, 144); ctx.stroke();
-  // dial inferior
-  ctx.beginPath(); ctx.arc(80, 182, 26, 0, Math.PI * 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(80, 182); ctx.lineTo(96, 166); ctx.stroke();
+  ctx.fillStyle = '#a3a19a';
+  ctx.beginPath(); ctx.arc(S / 2, 150, 122, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#6e6c66'; ctx.lineWidth = 4; ctx.stroke();
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#4a4842';
+  ctx.font = '13px Arial, sans-serif';
+  ctx.fillText('BMV-702', S / 2, 62);
+  ctx.fillText('BATTERY MONITOR', S / 2, 80);
+  ctx.fillStyle = '#1a4f8a';
+  ctx.beginPath(); ctx.arc(S / 2 - 76, 108, 11, 0, Math.PI * 2); ctx.fill();
+  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.fillText('victron energy', S / 2 + 14, 108);
+
+  ctx.fillStyle = '#aeb5a4'; ctx.fillRect(76, 126, 168, 56);     // LCD de segmentos
+  ctx.strokeStyle = '#6f7468'; ctx.lineWidth = 2; ctx.strokeRect(76, 126, 168, 56);
+  ctx.fillStyle = '#23261f';
+  ctx.font = 'bold 46px "Courier New", monospace';
+  ctx.fillText('0.00', 152, 156);
+  ctx.font = '14px Arial, sans-serif';
+  ctx.fillText('Ah', 224, 172);
+
+  ctx.font = '12px Arial, sans-serif';
+  ctx.fillStyle = '#4a4842';
+  ctx.fillText('SETUP', 96, 204);
+  ctx.fillText('SELECT', 224, 204);
+  for (const bx of [96, 224]) {
+    ctx.fillStyle = '#c6c4bd';
+    ctx.beginPath(); ctx.arc(bx, 232, 17, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#77756f'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.fillStyle = '#c6c4bd';
+  ctx.beginPath(); ctx.arc(160, 232, 26, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#77756f'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#3a3833';
+  ctx.font = 'bold 20px Arial, sans-serif';
+  ctx.fillText('+', 160, 218);
+  ctx.fillText('–', 160, 246);
+  return canvas;
+}
+
+/**
+ * PLAQUITA DEL PILOTO de alimentación del frente (fotos): placa blanca atornillada a la chapa
+ * azul con el nombre arriba —"Respaldo" o "Línea"— y la lámpara montada ATRAVESANDO su mitad
+ * inferior. Por eso el texto va arriba y el resto de la placa queda libre: lo tapa el lente.
+ */
+function _texturaRotuloPiloto(titulo) {
+  const W = 240, Hh = 300;
+  const { canvas, ctx } = _lienzo(W, Hh);
+  ctx.fillStyle = '#f5f3ee'; ctx.fillRect(0, 0, W, Hh);
+  ctx.strokeStyle = '#a8a69f'; ctx.lineWidth = 3;
+  ctx.strokeRect(2, 2, W - 4, Hh - 4);
+  ctx.fillStyle = '#1b1b18';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '36px Arial, sans-serif';
+  ctx.fillText(titulo, W / 2, 42);
+  return canvas;
+}
+
+/**
+ * PLAQUITA DE UN SELECTOR del frente (fotos): dos renglones — el nombre del mando y, debajo,
+ * sus POSICIONES en el orden en que las recorre la perilla. Va encima de la placa cromada,
+ * que es donde de verdad se lee para qué sirve girar: "Máx 0 Aut" en la iluminación (luz a
+ * tope, apagada o automática) y "0 1" en la sirena.
+ */
+function _texturaRotuloSelector(titulo, posiciones) {
+  const W = 300, Hh = 130;
+  const { canvas, ctx } = _lienzo(W, Hh);
+  ctx.fillStyle = '#f5f3ee'; ctx.fillRect(0, 0, W, Hh);
+  ctx.strokeStyle = '#a8a69f'; ctx.lineWidth = 3;
+  ctx.strokeRect(2, 2, W - 4, Hh - 4);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#1b1b18';
+  ctx.font = '40px Arial, sans-serif';
+  ctx.fillText(titulo, W / 2, 44);
+  ctx.fillStyle = '#3a3a35';
+  ctx.font = '32px Arial, sans-serif';
+  posiciones.forEach((p, i) => {
+    ctx.fillText(p, W / 2 + (i - (posiciones.length - 1) / 2) * 88, 96);
+  });
   return canvas;
 }
 
@@ -659,25 +812,65 @@ function _texturaMatting() {
 }
 
 /**
- * RÓTULO DE TOLVA de la UnidadREFUGE®: banda NARANJA con el texto en blanco sobre el frente azul de cada
- * tolva de carga. Identifica qué consumible lleva cada una — se rellenan a mano durante el
- * encierro y confundirlas dejaría la atmósfera sin tratar, por eso van rotuladas en alto
- * contraste. Una o dos líneas según el texto.
+ * REJILLA DE LAMAS de la boca de aspiración del frente: chapa oscura con lamas horizontales,
+ * canto iluminado arriba y sombra debajo. Sin ellas la boca se lee como un agujero negro
+ * pintado sobre la chapa — que es como se veía: un rectángulo plano de 0.32 × 0.59 m en mitad
+ * del frente. Con lamas se entiende por dónde entra el aire que la unidad va a lavar.
  */
-function _texturaTolva(lineas) {
-  const W = 340, Hh = 96;
+function _texturaRejilla() {
+  const W = 256, Hh = 140;
   const { canvas, ctx } = _lienzo(W, Hh);
-  ctx.fillStyle = '#e2620f'; ctx.fillRect(0, 0, W, Hh);
-  ctx.strokeStyle = '#8f3c06'; ctx.lineWidth = 4;
-  ctx.strokeRect(2, 2, W - 4, Hh - 4);
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#0d1014'; ctx.fillRect(0, 0, W, Hh);
+  for (let y = 8; y < Hh - 8; y += 14) {
+    ctx.fillStyle = '#333a42'; ctx.fillRect(6, y, W - 12, 4);
+    ctx.fillStyle = '#05070a'; ctx.fillRect(6, y + 4, W - 12, 6);
+  }
+  ctx.strokeStyle = '#3d444c'; ctx.lineWidth = 5;
+  ctx.strokeRect(3, 3, W - 6, Hh - 6);
+  return canvas;
+}
+
+/**
+ * RÓTULO DE TOLVA de la UnidadREFUGE® (fotos de cerca del frente): NO es una banda naranja con
+ * letras blancas —así estaba antes y a un metro se leía como una etiqueta de peligro— sino una
+ * PLACA BLANCA con filete fino, texto negro espaciado y una o dos PESTAÑAS DE COLOR en el canto
+ * derecho: naranja el absorbente, verde el catalizador.
+ *
+ * Identifica qué consumible lleva cada cajón. Se recargan a mano durante el encierro y
+ * confundirlos dejaría la atmósfera sin tratar, así que la pestaña de color es lo que se busca
+ * con la lámpara del casco antes de leer el texto.
+ *
+ * @param {string[]} lineas  uno o dos renglones
+ * @param {string[]} tabs    colores de las pestañas, apiladas de arriba abajo
+ */
+function _texturaRotuloTolva(lineas, tabs = ['#e2620f']) {
   const arr = Array.isArray(lineas) ? lineas : [lineas];
-  const tam = arr.length > 1 ? 26 : 32;
+  const tam = arr.length > 1 ? 44 : 54;
+  const ESP = 3;
+  // El lienzo se dimensiona a partir del RENGLÓN MÁS LARGO. Con un ancho fijo el rótulo de la
+  // tolva de CO2 desbordaba por los dos lados y se leía "ORBENTE DE C" — justo el dato que no
+  // se puede perder: el que dice cuál de los dos cajones lleva la cal sodada.
+  const medidor = document.createElement('canvas').getContext('2d');
+  medidor.font = `bold ${tam}px Arial, sans-serif`;
+  const anchoTxt = Math.max(...arr.map((t) =>
+    [...t].reduce((a, c) => a + medidor.measureText(c).width, 0) + ESP * Math.max(0, t.length - 1)));
+  const TAB_W = 46, MARGEN = 9;
+  const W = Math.ceil(anchoTxt + 72 + TAB_W + MARGEN), Hh = arr.length > 1 ? 176 : 110;
+  const { canvas, ctx } = _lienzo(W, Hh);
+  ctx.fillStyle = '#f6f4ef'; ctx.fillRect(0, 0, W, Hh);
+  ctx.strokeStyle = '#57554f'; ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, W - 4, Hh - 4);
+  const hTab = (Hh - 2 * MARGEN) / tabs.length;
+  tabs.forEach((c, i) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(W - TAB_W - MARGEN, MARGEN + i * hTab, TAB_W, hTab - (tabs.length > 1 ? 5 : 0));
+  });
+  ctx.fillStyle = '#141412';
+  ctx.textBaseline = 'middle';
   ctx.font = `bold ${tam}px Arial, sans-serif`;
+  const cx = (W - TAB_W - MARGEN) / 2;
   arr.forEach((ln, i) => {
-    ctx.fillText(ln, W / 2, Hh / 2 + (i - (arr.length - 1) / 2) * (tam + 6));
+    _textoEspaciado(ctx, ln, cx, Hh / 2 + (i - (arr.length - 1) / 2) * (tam + 12) + 2, ESP);
   });
   return canvas;
 }
@@ -997,7 +1190,7 @@ function _etiquetaRiesgo(ctx, x, y, w, h) {
   ctx.fillStyle = '#17170f';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `bold ${h * 0.21}px Arial, sans-serif`;
-  ctx.fillText('PRECAUCIÓN', x + w / 2, y + 6 + h * 0.15);
+  ctx.fillText('PRECAUCIÓN', x + w / 2, y + 6 + h * 0.15, w - 16);
   // triángulo negro con rayo amarillo
   const tcx = x + w * 0.21, tcy = y + h * 0.68, tr = h * 0.25;
   ctx.fillStyle = '#17170f';
@@ -1015,13 +1208,14 @@ function _etiquetaRiesgo(ctx, x, y, w, h) {
   ctx.lineTo(tcx + tr * 0.30, tcy - tr * 0.04);
   ctx.lineTo(tcx + tr * 0.02, tcy - tr * 0.04);
   ctx.closePath(); ctx.fill();
-  // texto bilingüe
+  // Texto bilingüe, ceñido al ancho que queda a la derecha del triángulo: sin ese tope se
+  // salía del lienzo y la pegatina se leía 'RIESGO EL' / 'ELECTRICAL'.
   ctx.fillStyle = '#17170f';
   ctx.textAlign = 'left';
   ctx.font = `bold ${h * 0.155}px Arial, sans-serif`;
-  ctx.fillText('RIESGO ELÉCTRICO', x + w * 0.40, y + h * 0.60);
+  ctx.fillText('RIESGO ELÉCTRICO', x + w * 0.40, y + h * 0.60, w * 0.55);
   ctx.font = `bold ${h * 0.135}px Arial, sans-serif`;
-  ctx.fillText('ELECTRICAL HAZARD', x + w * 0.40, y + h * 0.80);
+  ctx.fillText('ELECTRICAL HAZARD', x + w * 0.40, y + h * 0.80, w * 0.55);
   ctx.restore();
 }
 
@@ -3285,8 +3479,9 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
 
   // ── UnidadREFUGE® — central purificadora de aire "Dräger | SIMSA" ──
   S = sub(g, 'bpu', 'UnidadREFUGE® Dräger | SIMSA',
-    'Central purificadora de aire: gabinete azul con panel de control, paro de emergencia y ' +
-    'las dos salidas de aire. Recircula la atmósfera de la cámara por tres contenedores — cal ' +
+    'Central purificadora de aire: gabinete azul con el controlador Dräger|SIMSA, los ' +
+    'selectores de iluminación y sirena, el monitor de baterías y los pilotos de LÍNEA y ' +
+    'RESPALDO. Recircula la atmósfera de la cámara por tres contenedores — cal ' +
     'sodada Drägersorb® 400 (absorbe CO2), ChamberCatalysis® (cataliza el CO) y sílice gel ' +
     '(absorbe humedad) — con un ventilador por contenedor.');
   const bpu = new THREE.Group();
@@ -3308,75 +3503,198 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     new THREE.BoxGeometry(0.02, 0.32, 0.59),
     MineMaterials.plano(0x14181c, { rough: 0.75, metal: 0.3 })
   );
-  grid.position.set(gabD / 2 + 0.001, 0.62, 0);
+  grid.position.set(gabD / 2 - 0.008, 0.62, 0);
   bpu.add(grid);
-  // manguera negra enrollada colgada al costado frontal-izquierdo (foto)
+  const caraGrid = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.59, 0.32),
+    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaRejilla()), roughness: 0.8, metalness: 0.25 })
+  );
+  caraGrid.rotation.y = Math.PI / 2;
+  caraGrid.position.set(gabD / 2 + 0.003, 0.62, 0);
+  bpu.add(caraGrid);
+  // MANGUERA de carga enrollada, colgada de un gancho en el COSTADO. Antes colgaba del frente y
+  // tapaba media rejilla, y en las fotos de frente la chapa está limpia: los 0.67 m de frente
+  // son para los mandos, la boca de aspiración y el registro, no para guardar accesorios.
+  const mRolloBpu = MineMaterials.plano(0x101012, { rough: 0.7 });
   for (let i = 0; i < 3; i++) {
-    const rollo = new THREE.Mesh(
-      new THREE.TorusGeometry(0.085, 0.013, 8, 18),
-      MineMaterials.plano(0x101012, { rough: 0.7 })
-    );
-    rollo.rotation.y = Math.PI / 2;
-    rollo.position.set(gabD / 2 + 0.03 + i * 0.018, 0.72, -gabW / 2 + 0.1);
+    const rollo = new THREE.Mesh(new THREE.TorusGeometry(0.072, 0.012, 8, 18), mRolloBpu);
+    rollo.position.set(-0.02, 0.78, gabW / 2 + 0.011 + i * 0.015);
     bpu.add(rollo);
   }
-  // ── FRANJA DE MANDOS, a ras del frente ──────────────────────────────
-  //  En la foto NO hay pupitre inclinado: es una franja horizontal de ~10 cm empotrada en lo
-  //  alto del frente azul. De izquierda a derecha (mirando la máquina): dos interruptores
-  //  plateados, el visor, el pulsador ROJO de paro y el VERDE de marcha. Con el operador de pie
-  //  a 1.1 m, una franja plana se lee igual y no rompe la caja como un pupitre.
-  const yPanel = gabAlto - 0.15;
-  const franja = new THREE.Mesh(
-    new THREE.BoxGeometry(0.035, 0.115, 0.60),
-    MineMaterials.plano(0x0f4a90, { rough: 0.5, metal: 0.3 })
+  const gancho = new THREE.Mesh(
+    new THREE.TorusGeometry(0.016, 0.004, 6, 12, Math.PI * 1.4),
+    MineMaterials.plano(0x8a8880, { rough: 0.45, metal: 0.7 })
   );
-  franja.position.set(gabD / 2 - 0.005, yPanel, 0);
-  bpu.add(franja);
-  const caraPanel = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.58, 0.105),
-    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaPanelUnidadRefuge()), roughness: 0.5 })
+  gancho.position.set(-0.02, 0.860, gabW / 2 + 0.012);
+  bpu.add(gancho);
+  // ── FRENTE DE MANDOS (fotos de cerca del panel real) ────────────────
+  //  No hay pupitre inclinado ni panel impreso: los mandos van ATORNILLADOS sobre la chapa
+  //  azul, en una sola fila a 1.10 m — la altura a la que los opera alguien de pie. De la
+  //  izquierda del operador a su derecha: selector de ILUMINACIÓN (Máx-0-Aut), selector de
+  //  SIRENA (0-1), el controlador Dräger|SIMSA, el piloto RESPALDO, el monitor de baterías y
+  //  el piloto LÍNEA.
+  //
+  //  Aquí antes había un "paro de emergencia" rojo y un pulsador verde de marcha, y era una
+  //  invención: en la foto el rojo y el verde NO son pulsadores sino PILOTOS DE ALIMENTACIÓN
+  //  rotulados "Respaldo" (la unidad corriendo con sus baterías) y "Línea" (con la red de
+  //  mina) — la misma pareja de estados que anuncia la baliza exterior del refugio. Y un paro
+  //  de emergencia no pinta nada en la única máquina que NO se debe poder apagar de un
+  //  manotazo mientras hay veinte personas encerradas respirando de ella.
+  //
+  //  El observador mira la UnidadREFUGE® desde +X, así que SU izquierda es +Z: los mandos se
+  //  reparten de +Z a -Z para leerse en el mismo orden que en la foto. Las cotas salen de la
+  //  propia foto tomando como escala el controlador, que es un formato DIN de 144 × 96 mm.
+  const yPanel = gabAlto - 0.13;
+  const xFrente = gabD / 2;
+  const mChapaMando = MineMaterials.plano(0xc9c9c2, { rough: 0.35, metal: 0.7 });
+  // Las PLACAS de montaje van menos metálicas que los casquillos: sin mapa de entorno, un
+  // metal de 0.7 devuelve casi negro y las placas de los selectores se veían oscuras, cuando
+  // en la foto son dos cuadrados claros que destacan sobre el azul.
+  const mPlacaMando = MineMaterials.plano(0xbdbcb6, { rough: 0.45, metal: 0.35 });
+  const mPerilla    = MineMaterials.plano(0x131315, { rough: 0.42, metal: 0.15 });
+  const mRotulo = (lienzo) => new THREE.MeshStandardMaterial({ map: _aTextura(lienzo), roughness: 0.55 });
+
+  /** Piloto de alimentación: plaquita rotulada + casquillo cromado + lente de Ø 40 mm. */
+  const _piloto = (z, titulo, color, encendido) => {
+    const placa = new THREE.Mesh(
+      new THREE.BoxGeometry(0.006, 0.064, 0.048),
+      MineMaterials.plano(0xf0eee8, { rough: 0.55 })
+    );
+    placa.position.set(xFrente + 0.003, yPanel, z);
+    bpu.add(placa);
+    const rot = new THREE.Mesh(new THREE.PlaneGeometry(0.048, 0.064), mRotulo(_texturaRotuloPiloto(titulo)));
+    rot.rotation.y = Math.PI / 2;
+    rot.position.set(xFrente + 0.0065, yPanel, z);
+    bpu.add(rot);
+    // Portalámparas de tablero de 30 mm: el lente sobresale 40 mm de diámetro.
+    const casquillo = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.020, 0.008, 16), mChapaMando);
+    casquillo.rotation.z = Math.PI / 2;
+    casquillo.position.set(xFrente + 0.010, yPanel - 0.010, z);
+    bpu.add(casquillo);
+    //  ENCENDIDO SÓLO EL VERDE, como en la foto: el refugio está en espera, alimentado por la
+    //  red de mina, así que "Línea" alumbra y "Respaldo" queda apagado — vidrio rojo oscuro.
+    const cristal = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.019, 0.013, 18),
+      MineMaterials.plano(color, {
+        rough: 0.25,
+        emissive: encendido ? color : 0x000000,
+        emissiveIntensity: encendido ? 1.6 : 0
+      })
+    );
+    cristal.rotation.z = Math.PI / 2;
+    cristal.position.set(xFrente + 0.019, yPanel - 0.010, z);
+    cristal.name = encendido ? 'bpu_piloto_linea' : 'bpu_piloto_respaldo';
+    bpu.add(cristal);
+  };
+
+  /** Selector giratorio: rótulo arriba, placa cromada y perilla negra con aleta indicadora. */
+  const _selector = (z, titulo, posiciones, giro) => {
+    const rot = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.058, 0.025),
+      mRotulo(_texturaRotuloSelector(titulo, posiciones))
+    );
+    rot.rotation.y = Math.PI / 2;
+    rot.position.set(xFrente + 0.003, yPanel + 0.046, z);
+    bpu.add(rot);
+    const placa = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.052, 0.042), mPlacaMando);
+    placa.position.set(xFrente + 0.0025, yPanel, z);
+    bpu.add(placa);
+    const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.018, 16), mPerilla);
+    cuerpo.rotation.z = Math.PI / 2;
+    cuerpo.position.set(xFrente + 0.013, yPanel, z);
+    bpu.add(cuerpo);
+    // La aleta marca la posición en la que quedó el selector: los dos están en posiciones
+    // distintas, que es lo que se ve en la foto y lo que delata que son mandos y no pilotos.
+    const aleta = new THREE.Mesh(new THREE.BoxGeometry(0.011, 0.028, 0.010), mPerilla);
+    aleta.position.set(xFrente + 0.019, yPanel + 0.007 * Math.cos(giro), z + 0.007 * Math.sin(giro));
+    aleta.rotation.x = giro;
+    bpu.add(aleta);
+  };
+
+  _selector( 0.252, 'Iluminación', ['Máx', '0', 'Aut'], -0.55);
+  _selector( 0.116, 'Sirena',      ['0', '1'],           0.40);
+
+  // ── CONTROLADOR "Dräger | SIMSA" (144 × 96 mm, formato DIN de tablero) ──
+  const CTRL_W = 0.145, CTRL_H = 0.096, Z_CTRL = -0.027;
+  const marcoCtrl = new THREE.Mesh(
+    new THREE.BoxGeometry(0.013, CTRL_H, CTRL_W),
+    MineMaterials.plano(0x5d4c3c, { rough: 0.55, metal: 0.2 })
   );
-  caraPanel.rotation.y = Math.PI / 2;
-  caraPanel.position.set(gabD / 2 + 0.014, yPanel, 0);
-  bpu.add(caraPanel);
-  // El observador mira la UnidadREFUGE® desde +X, así que SU izquierda es +Z: los interruptores quedan
-  // en +Z y los pulsadores en -Z, en el mismo orden que la foto.
-  const mInterr = MineMaterials.plano(0xc9c9c2, { rough: 0.35, metal: 0.7 });
-  for (const iz of [0.225, 0.160]) {
-    const palanca = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.055, 0.022), mInterr);
-    palanca.position.set(gabD / 2 + 0.020, yPanel, iz);
-    bpu.add(palanca);
+  marcoCtrl.position.set(xFrente + 0.005, yPanel, Z_CTRL);
+  bpu.add(marcoCtrl);
+  //  El LCD va RETROILUMINADO: en la foto tiñe de magenta la chapa azul de alrededor. La misma
+  //  textura sirve de mapa emisivo, así que en la penumbra del refugio la pantalla es lo
+  //  primero que se ve de la unidad — que es justamente cómo se la localiza al entrar.
+  const lienzoCtrl = _texturaControladorSIMSA();
+  const texCtrl = _aTextura(lienzoCtrl);
+  const caraCtrl = new THREE.Mesh(
+    new THREE.PlaneGeometry(CTRL_W, CTRL_H),
+    new THREE.MeshStandardMaterial({
+      map: texCtrl, emissiveMap: texCtrl, emissive: 0xffffff, emissiveIntensity: 0.32, roughness: 0.45
+    })
+  );
+  caraCtrl.rotation.y = Math.PI / 2;
+  caraCtrl.position.set(xFrente + 0.0125, yPanel, Z_CTRL);
+  caraCtrl.name = 'bpu_controlador';
+  bpu.add(caraCtrl);
+
+  _piloto(-0.153, 'Respaldo', 0xd01111, false);
+
+  // ── MONITOR DE BATERÍAS embutido en placa de aluminio cepillado ──────
+  const MED = 0.082, Z_MED = -0.229;
+  const placaMed = new THREE.Mesh(
+    new THREE.BoxGeometry(0.007, MED, MED),
+    MineMaterials.plano(0xb6b4ad, { rough: 0.4, metal: 0.65 })
+  );
+  placaMed.position.set(xFrente + 0.0035, yPanel, Z_MED);
+  bpu.add(placaMed);
+  const caraMed = new THREE.Mesh(new THREE.PlaneGeometry(MED, MED), mRotulo(_texturaMonitorBateria()));
+  caraMed.rotation.y = Math.PI / 2;
+  caraMed.position.set(xFrente + 0.0075, yPanel, Z_MED);
+  caraMed.name = 'bpu_monitor_baterias';
+  bpu.add(caraMed);
+
+  _piloto(-0.305, 'Línea', 0x18b038, true);
+
+  // ── REGISTRO INFERIOR CON TIRADOR EMBUTIDO (foto) ───────────────────
+  //  A 13 cm bajo los mandos la chapa se corta en una tapa de registro con un tirador negro
+  //  embutido al centro: es por donde se llega al cableado y a los ventiladores sin mover la
+  //  unidad de su sitio. Sin esa junta el frente se ve como un bloque de chapa de 1,2 m, que
+  //  es lo que delataba al gabinete como una caja y no como una máquina.
+  const mJunta = MineMaterials.plano(0x0b2138, { rough: 0.85 });
+  for (const yJunta of [0.975, 0.805]) {
+    const juntaReg = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.005, 0.60), mJunta);
+    juntaReg.position.set(xFrente + 0.001, yJunta, 0);
+    bpu.add(juntaReg);
   }
-  const visor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.012, 0.072, 0.145),
-    MineMaterials.plano(0xf0f2f0, { rough: 0.25, metal: 0.15 })
+  const huecoReg = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.075, 0.033),
+    MineMaterials.plano(0x08090b, { rough: 0.9 })
   );
-  visor.position.set(gabD / 2 + 0.018, yPanel, 0.02);
-  bpu.add(visor);
-  const paro = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.028, 0.028, 0.022, 14),
-    MineMaterials.plano(0xd01111, { rough: 0.4, emissive: 0x400000, emissiveIntensity: 0.4 })
+  huecoReg.rotation.y = Math.PI / 2;
+  huecoReg.position.set(xFrente + 0.001, 0.905, 0);
+  bpu.add(huecoReg);
+  const tiradorReg = new THREE.Mesh(
+    new THREE.BoxGeometry(0.004, 0.011, 0.050),
+    MineMaterials.plano(0x9a978e, { rough: 0.5, metal: 0.6 })
   );
-  paro.rotation.z = Math.PI / 2;
-  paro.position.set(gabD / 2 + 0.022, yPanel, -0.135);
-  bpu.add(paro);
-  const btnVerde = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.026, 0.026, 0.022, 12),
-    MineMaterials.plano(0x18b038, { rough: 0.4, emissive: 0x0a4015, emissiveIntensity: 0.6 })
-  );
-  btnVerde.rotation.z = Math.PI / 2;
-  btnVerde.position.set(gabD / 2 + 0.022, yPanel, -0.220);
-  bpu.add(btnVerde);
+  tiradorReg.position.set(xFrente + 0.0022, 0.900, 0);
+  bpu.add(tiradorReg);
 
   // ── TOLVAS DE CONSUMIBLE sobre el gabinete ──────────────────────────
   //  Son las dos bocas por las que se carga el material que trata el aire: a un lado el
-  //  ABSORBENTE DE CO2 (cal sodada) y al otro el ABSORBENTE DE HUMEDAD con el CATALIZADOR DE CO.
-  //  Van rotuladas en naranja porque confundirlas durante el encierro dejaría la atmósfera sin
-  //  tratar. Cada una lleva su TAPA DE CARGA naranja arriba.
+  //  ABSORBENTE DE CO2 (cal sodada) y al otro el ABSORBENTE DE HUMEDAD con el CATALIZADOR DE
+  //  CO. Van rotuladas porque confundirlas durante el encierro dejaría la atmósfera sin tratar.
   //  Son DEPÓSITOS HUECOS y van SIN TAPA: el cuerpo se arma con cuatro paredes de chapa y un
   //  fondo, sin cara superior, de modo que al asomarse se ve el cajón vacío por dentro.
-  const TOLVA_W = 0.315, TOLVA_H = 0.22, TOLVA_D = 0.38;
+  //
+  //  MEDIDAS de la foto de frente, con el controlador (144 mm) como escala: cada cajón mide
+  //  0.28 m de ancho y 0.23 de alto, y entre los dos queda una LUZ de 3 cm — antes se tocaban.
+  //  Esa luz no es un descuido de montaje: por ella asoma la brida que amarra los dos cajones.
+  const TOLVA_W = 0.28, TOLVA_H = 0.23, TOLVA_D = 0.38;
+  const TOLVA_SEP = 0.03;           // luz entre las dos tolvas
   const TOLVA_E = 0.014;            // espesor de la chapa del depósito
+  const TOLVA_Z = TOLVA_W / 2 + TOLVA_SEP / 2;
   // Las paredes se ven por sus DOS caras (fuera y dentro del cajón abierto), así que llevan
   // material propio: no se puede tocar `.side` de los materiales cacheados de MineMaterials.
   const mChapaTolva = new THREE.MeshStandardMaterial({
@@ -3384,9 +3702,9 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   });
   const mFondoTolva = MineMaterials.plano(0x102a44, { rough: 0.9, metal: 0.1 });
 
-  for (const [tz, lineas] of [
-    [ TOLVA_W / 2 + 0.002, ['ABSORBENTE DE CO2']],
-    [-TOLVA_W / 2 - 0.002, ['ABSORBENTE HUMEDAD', 'CATALIZADOR CO']]
+  for (const [tz, lineas, tabs] of [
+    [ TOLVA_Z, ['ABSORBENTE DE CO2'],                    ['#e2620f']],
+    [-TOLVA_Z, ['ABSORBENTE HUMEDAD', 'CATALIZADOR CO'], ['#e2620f', '#1d6b3a']]
   ]) {
     const yBase = gabAlto;
     // cuatro paredes, sin cara superior
@@ -3410,47 +3728,212 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     fondoTolva.position.set(-0.02, yBase + 0.006, tz);
     bpu.add(fondoTolva);
 
-    const rotuloTolva = new THREE.Mesh(
-      new THREE.PlaneGeometry(TOLVA_W - 0.03, (TOLVA_W - 0.03) * 96 / 340),
-      new THREE.MeshStandardMaterial({ map: _aTextura(_texturaTolva(lineas)), roughness: 0.6 })
-    );
+    // El rótulo va en el TERCIO ALTO de la cara frontal, y los dos comparten canto superior:
+    // el de dos renglones baja, no se centra. Así se leen en línea, como en la foto.
+    const lienzoRot = _texturaRotuloTolva(lineas, tabs);
+    const rotW = TOLVA_W - 0.035;
+    const rotH = rotW * lienzoRot.height / lienzoRot.width;
+    const rotuloTolva = new THREE.Mesh(new THREE.PlaneGeometry(rotW, rotH), mRotulo(lienzoRot));
     rotuloTolva.rotation.y = Math.PI / 2;
-    rotuloTolva.position.set(-0.02 + TOLVA_D / 2 + 0.002, gabAlto + TOLVA_H / 2 + 0.015, tz);
+    rotuloTolva.position.set(-0.02 + TOLVA_D / 2 + 0.003, yBase + TOLVA_H - 0.055 - rotH / 2, tz);
+    rotuloTolva.name = 'bpu_rotulo_tolva';
     bpu.add(rotuloTolva);
+  }
+
+  // ── BRIDA QUE UNE LAS DOS TOLVAS (foto de cerca) ────────────────────
+  //  En la luz entre cajones asoman dos flejes de acero que convergen hacia abajo, con cuatro
+  //  tornillos Allen. Es lo que impide que los cajones —más de 20 kg de cal sodada cada uno— se
+  //  abran hacia fuera al llenarlos. Detrás de ellos, la ranura queda en sombra.
+  const xBrida = -0.02 + TOLVA_D / 2;
+  const ranuraTolvas = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, TOLVA_H, TOLVA_SEP),
+    MineMaterials.plano(0x0a1520, { rough: 0.95 })
+  );
+  ranuraTolvas.position.set(xBrida - 0.06, gabAlto + TOLVA_H / 2, 0);
+  bpu.add(ranuraTolvas);
+  const mBrida = MineMaterials.plano(0x717a88, { rough: 0.48, metal: 0.6 });
+  for (const bz of [TOLVA_SEP / 2, -TOLVA_SEP / 2]) {
+    const giro = bz > 0 ? 0.055 : -0.055;
+    const fleje = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.135, 0.018), mBrida);
+    fleje.position.set(xBrida + 0.004, gabAlto + 0.082, bz);
+    fleje.rotation.x = giro;
+    bpu.add(fleje);
+    for (const by of [0.134, 0.036]) {
+      const tornilloBrida = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.010, 6), mBrida);
+      tornilloBrida.rotation.z = Math.PI / 2;
+      tornilloBrida.position.set(xBrida + 0.011, gabAlto + by, bz + (by - 0.082) * Math.sin(giro));
+      bpu.add(tornilloBrida);
+    }
+  }
+
+  // ── PERILLAS DE LA CUBIERTA — una por tolva (foto de cerca) ─────────
+  //  Sobre la cubierta, delante de cada cajón, va una perilla negra con casquillo cromado: la
+  //  que abre el paso de aire por SU contenedor. Están arriba y no en el frente porque se
+  //  manipulan mientras se recarga el absorbente, con el cajón abierto y a la vista.
+  for (const pz of [TOLVA_Z, -TOLVA_Z]) {
+    const casquilloPerilla = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.019, 0.019, 0.012, 18), mChapaMando
+    );
+    casquilloPerilla.position.set(0.22, gabAlto + 0.006, pz);
+    bpu.add(casquilloPerilla);
+    const perilla = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.024, 18), mPerilla);
+    perilla.position.set(0.22, gabAlto + 0.024, pz);
+    perilla.castShadow = true;
+    bpu.add(perilla);
+    const aletaPerilla = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.009, 0.016), mPerilla);
+    aletaPerilla.position.set(0.226, gabAlto + 0.034, pz);
+    bpu.add(aletaPerilla);
   }
 
   // etiqueta amarilla de advertencia (foto: esquina inferior izquierda del frente)
   const etiqueta = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.14, 0.07),
-    MineMaterials.plano(0xf5c300, { rough: 0.6 })
+    new THREE.PlaneGeometry(0.14, 0.093),
+    new THREE.MeshStandardMaterial({ map: _aTextura(_texturaEtiquetaRiesgo()), roughness: 0.65 })
   );
   etiqueta.rotation.y = Math.PI / 2;
-  etiqueta.position.set(gabD / 2 + 0.002, 0.20, 0.20);
+  etiqueta.position.set(gabD / 2 + 0.002, 0.21, 0.20);
   bpu.add(etiqueta);
   // logo Dräger | SIMSA — UnidadREFUGE®
   const bpuLogo = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.5, 0.16),
+    new THREE.PlaneGeometry(0.34, 0.109),
     new THREE.MeshStandardMaterial({ map: _aTextura(_texturaUnidadRefuge()), transparent: true, roughness: 0.5 })
   );
   bpuLogo.rotation.y = Math.PI / 2;
-  bpuLogo.position.set(gabD / 2 + 0.022, 0.31, 0);
+  bpuLogo.position.set(gabD / 2 + 0.022, 0.33, -0.08);
   bpu.add(bpuLogo);
+
+  // ════════════════════════════════════════════════════════════════
+  //  COMUNICADOR DE EMERGENCIA — atornillado al COSTADO de la UnidadREFUGE®
+  // ════════════════════════════════════════════════════════════════
+  //  Foto real: va sujeto al propio flanco del gabinete (no al testero), en la cara del rótulo
+  //  ABSORBENTE DE CO2, a la altura de quien opera el panel. Cuerpo negro con etiqueta y piloto
+  //  de línea, auricular colgado con cable en espiral rematado en su conector, y bajante que
+  //  sube por el costado hasta el conducto de la instrumentación.
+  //  Es el enlace con superficie que exige el D.S. 024-2016-EM: encerrados 36 h, reportar la
+  //  dotación y el estado de la atmósfera es lo primero que se hace al sellar las puertas.
+  S = sub(g, 'comunicador_emergencia', 'Comunicador de emergencia',
+    'Unidad de comunicación con superficie atornillada al costado de la UnidadREFUGE®: cuerpo ' +
+    'negro con etiqueta y piloto de línea, auricular colgado con cable en espiral y bajante al ' +
+    'conducto de la instrumentación.');
+  // Anclado al gabinete: si la UnidadREFUGE® se mueve, estas cotas la siguen.
+  const zCaraCom = bpu.position.z + gabW / 2;       // flanco +Z del gabinete
+  // +0.17 y no menos: la manguera enrollada del gabinete ocupa el costado hasta x local 0.052
+  const xCom = bpu.position.x + 0.17;               // hacia el frente del costado
+  const yCom = bpu.position.y + 0.80;               // bajo el panel, a la mano
+  const zFrenteCom = zCaraCom + 0.076;              // cara vista de la unidad
+  const mComCuerpo = MineMaterials.plano(0x2a2d32, { rough: 0.6, metal: 0.15 });
+  const mComAuric = MineMaterials.plano(0x141518, { rough: 0.7, metal: 0.1 });
+  const mComPlaca = MineMaterials.plano(0xa8a69c, { rough: 0.45, metal: 0.6 });
+  const mComCable = MineMaterials.plano(0x121214, { rough: 0.8 });
+
+  // placa de montaje atornillada a la chapa del gabinete
+  const placaCom = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.35, 0.014), mComPlaca);
+  placaCom.position.set(xCom, yCom, zCaraCom + 0.007);
+  S.add(placaCom);
+  for (const py of [-0.155, 0.155]) {
+    const tornCom = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.008, 8), mComPlaca);
+    tornCom.rotation.x = Math.PI / 2;
+    tornCom.position.set(xCom, yCom + py, zCaraCom + 0.018);
+    S.add(tornCom);
+  }
+
+  // cuerpo de la unidad
+  const cuerpoCom = new THREE.Mesh(new THREE.BoxGeometry(0.098, 0.27, 0.062), mComCuerpo);
+  cuerpoCom.position.set(xCom, yCom, zCaraCom + 0.045);
+  cuerpoCom.castShadow = true;
+  S.add(cuerpoCom);
+
+  // rejilla del altavoz y piloto verde de línea activa
+  for (let i = 0; i < 4; i++) {
+    const ranuraCom = new THREE.Mesh(
+      new THREE.BoxGeometry(0.055, 0.005, 0.004),
+      MineMaterials.plano(0x0c0c0e, { rough: 0.9 })
+    );
+    ranuraCom.position.set(xCom, yCom + 0.098 - i * 0.014, zFrenteCom + 0.001);
+    S.add(ranuraCom);
+  }
+  const ledCom = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.005, 0.005, 0.006, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x2eff5e, emissive: 0x2eff5e, emissiveIntensity: 2.4, roughness: 0.3
+    })
+  );
+  ledCom.rotation.x = Math.PI / 2;
+  ledCom.position.set(xCom + 0.034, yCom + 0.032, zFrenteCom + 0.003);
+  S.add(ledCom);
+
+  // etiqueta blanca, BAJO el auricular para que no quede tapada
+  const etqCom = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.055, 0.030),
+    new THREE.MeshStandardMaterial({
+      map: _aTextura(_texturaRotulo('EMERGENCIA', { fondo: '#eceae2', tinta: '#1b1b16', tam: 34 })),
+      roughness: 0.7
+    })
+  );
+  etqCom.position.set(xCom - 0.020, yCom - 0.106, zFrenteCom + 0.002);
+  S.add(etqCom);
+
+  // horquilla y auricular colgado por delante
+  const horquillaCom = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.016, 0.022), mComAuric);
+  horquillaCom.position.set(xCom - 0.012, yCom + 0.118, zFrenteCom + 0.012);
+  S.add(horquillaCom);
+  const auricularCom = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.155, 0.042), mComAuric);
+  auricularCom.position.set(xCom - 0.012, yCom + 0.030, zFrenteCom + 0.030);
+  auricularCom.rotation.z = 0.04;
+  auricularCom.castShadow = true;
+  S.add(auricularCom);
+  for (const cy of [yCom + 0.100, yCom - 0.040]) {   // cápsulas de escucha y voz
+    const capsulaCom = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.026, 0.026, 0.014, 12), mComAuric
+    );
+    capsulaCom.rotation.x = Math.PI / 2;
+    capsulaCom.position.set(xCom - 0.012, cy, zFrenteCom + 0.052);
+    S.add(capsulaCom);
+  }
+
+  // cable en espiral, rematado en el conector blanco de la foto
+  const yFinEspiral = yCom - 0.090 - 5 * 0.017;
+  for (let i = 0; i < 6; i++) {
+    const vueltaCom = new THREE.Mesh(new THREE.TorusGeometry(0.021, 0.005, 6, 16), mComCable);
+    vueltaCom.rotation.x = Math.PI / 2;
+    vueltaCom.position.set(xCom + 0.024, yCom - 0.090 - i * 0.017, zFrenteCom + 0.026);
+    S.add(vueltaCom);
+  }
+  const colaCom = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.05, 6), mComCable);
+  colaCom.position.set(xCom + 0.024, yFinEspiral - 0.030, zFrenteCom + 0.026);
+  S.add(colaCom);
+  const conectorCom = new THREE.Mesh(
+    new THREE.BoxGeometry(0.016, 0.034, 0.02),
+    MineMaterials.plano(0xe8e6dc, { rough: 0.65 })
+  );
+  conectorCom.position.set(xCom + 0.024, yFinEspiral - 0.070, zFrenteCom + 0.026);
+  S.add(conectorCom);
+
 
   // ── BATERÍA DE CILINDROS DE O2 junto a la UnidadREFUGE®, con eslinga de carraca
   //    y manifold colgado sobre ellos ─────────────────────────────────
   S = sub(g, 'cilindros_o2', 'Cilindros de O2',
-    'Batería de CUATRO cilindros crema en fila contra el costado, con marcas ' +
+    'Batería de CUATRO cilindros crema en DOS FILAS DE DOS contra el costado, con marcas ' +
     'estarcidas y cinta verde, cabezal de bronce con volante, regulador "OXYGEN" ' +
     'con manómetro bar/psi, flujómetro de tubo y perilla verde, eslinga de carraca ' +
     'y manifold con latiguillos.');
   const o2Blancos = new THREE.Group();
   o2Blancos.position.set(-1.98, y0 + t, -0.92);
   S.add(o2Blancos);
-  // CUATRO cilindros en una sola fila contra el costado: en 2×2 la pareja trasera quedaba
-  // exactamente detrás de la delantera y desde la sala sólo se leían dos botellas.
-  // Ø 0.23 m × 1.6 m (botella industrial de 50 L), separadas 0.24 m (casi tocándose).
+  // CUATRO cilindros en 2 FILAS x 2 COLUMNAS, que es como se estiba la batería contra el
+  // rincón: ocupa la mitad de frente que la fila corrida y deja libre el paso lateral.
+  // Ø 0.23 m × 1.6 m (botella industrial de 50 L).
+  //
+  // El paso entre filas (0.30 m) es mayor que el de columnas (0.27) A PROPÓSITO: puestas a
+  // distancia igual, la pareja trasera queda exactamente detrás de la delantera y desde la sala
+  // sólo se leen dos botellas. Con la fila de atrás algo más separada, sus cabezales —que es lo
+  // que de verdad identifica al cilindro: volante, regulador y manómetro— asoman por encima.
   const O2_ALTO = 1.6, O2_RADIO = 0.115;
-  const posO2 = [[0, -0.36], [0, -0.12], [0, 0.12], [0, 0.36]];
+  const O2_PASO_FILA = 0.30, O2_PASO_COL = 0.27;
+  const posO2 = [];
+  for (const px of [-O2_PASO_FILA / 2, O2_PASO_FILA / 2]) {
+    for (const pz of [-O2_PASO_COL / 2, O2_PASO_COL / 2]) posO2.push([px, pz]);
+  }
   posO2.forEach(([px, pz], i) => {
     const cil = _cilindroO2(O2_ALTO, O2_RADIO, { seed: i + 1 });
     cil.position.set(px, 0, pz);
@@ -3466,9 +3949,11 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   // ── ESLINGA NARANJA DE CARRACA (D.S. 024: cilindros asegurados) ──────
   //  Una botella de O2 a 200 bar suelta es un proyectil: la eslinga con carraca es obligatoria y
   //  en la foto es de lo más visible de la escena. Abraza las CUATRO botellas y tensa contra un
-  //  cáncamo del mamparo; la carraca queda al frente, donde se aprieta.
+  //  cáncamo del mamparo; la carraca queda al frente, donde se aprieta. Abraza el bloque
+  //  entero, las cuatro botellas, no sólo una fila.
   const mCorrea = MineMaterials.plano(0xd86a10, { rough: 0.78, metal: 0.05 });
-  const semiX = O2_RADIO, semiZ = 0.36 + O2_RADIO;    // tangente a la fila de botellas
+  const semiX = O2_PASO_FILA / 2 + O2_RADIO;          // tangente al bloque 2x2
+  const semiZ = O2_PASO_COL / 2 + O2_RADIO;
   const yCorrea = 1.02;
   for (const cx of [-semiX, semiX]) {                 // los dos ramales, delante y detrás
     const tramo = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.055, 2 * semiZ), mCorrea);
@@ -3502,16 +3987,16 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
   // ── Manifold de pared: dos tubos horizontales con abrazaderas y las
   //    latiguillos de cada cabezal subiendo hasta ellos (foto real) ──
   const mTuboO2 = MineMaterials.plano(0xa8a49a, { rough: 0.32, metal: 0.78 });
-  //  Corre PARALELO a la fila (eje Z) para que cada botella tenga su toma justo encima; como
+  //  Colector unico en el eje Z al que suben las CUATRO botellas de las dos filas; como
   //  ahí no hay pared a la que amarrarlo, cuelga de la bóveda con dos tirantes.
   for (const ty of [2.24, 2.16]) {
-    const tuboO2 = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 1.12, 12), mTuboO2);
+    const tuboO2 = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.70, 12), mTuboO2);
     tuboO2.rotation.x = Math.PI / 2;
     tuboO2.position.set(-0.20, ty, 0);
     o2Blancos.add(tuboO2);
   }
   const mAbraz = MineMaterials.plano(0x77746c, { rough: 0.5, metal: 0.55 });
-  for (const bz of [-0.42, 0.34]) {
+  for (const bz of [-0.26, 0.22]) {
     const abraz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.15, 0.035), mAbraz);
     abraz.position.set(-0.22, 2.20, bz);
     o2Blancos.add(abraz);
@@ -3525,7 +4010,9 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
       new THREE.Vector3(px + 0.118, yCabezal + 0.20, pz + 0.072),
       new THREE.Vector3(px + 0.08, yCabezal + 0.31, pz + 0.05),
       new THREE.Vector3(px - 0.08, yCabezal + 0.40, pz + 0.01),
-      new THREE.Vector3(px - 0.20, 2.16, pz)
+      // Todas las tomas mueren en el MISMO colector (x = -0.20), venga la botella de la fila
+      // de delante o de la de atrás; se separan un poco en Z para no solaparse dos a dos.
+      new THREE.Vector3(-0.20, 2.16, pz + (px > 0 ? 0.035 : -0.035))
     ]);
     o2Blancos.add(new THREE.Mesh(new THREE.TubeGeometry(curva, 20, 0.010, 6, false), mLatiguillo));
   }
@@ -4138,7 +4625,7 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     new THREE.Vector3(0.058, 0.055, 0.202),
     new THREE.Vector3(0.040, -0.05, 0.13),
     new THREE.Vector3(0.022, -0.30, 0.02),
-    new THREE.Vector3(0.018, -0.72, -0.05)
+    new THREE.Vector3(0.020, -0.79, -0.05)
   ]);
   instr.add(new THREE.Mesh(new THREE.TubeGeometry(curvaBal, 26, 0.008, 6, false), mNegroMate));
   const cajaPaso = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.09, 0.07), mNegroMate);
@@ -4417,14 +4904,17 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     new THREE.PlaneGeometry(anchoProcO2, anchoProcO2 * (lienzoProcO2.height / lienzoProcO2.width)),
     new THREE.MeshStandardMaterial({ map: _aTextura(lienzoProcO2), roughness: 0.55 })
   );
-  procO2.position.set(-1.30, y0 + 1.44, -(A / 2 - t - 0.012));
+  // A la DERECHA de la escotilla de emergencia, que ocupa x -1.33..-0.57 en este mismo
+  // hastial: en su sitio anterior (x=-1.30) el cartel quedaba montado sobre la hoja.
+  const xProcO2 = -0.10;
+  procO2.position.set(xProcO2, y0 + 1.44, -(A / 2 - t - 0.012));
   S.add(procO2);
   // placa de respaldo metálica que hace de marco
   const marcoProc = new THREE.Mesh(
     new THREE.PlaneGeometry(anchoProcO2 + 0.026, anchoProcO2 * (lienzoProcO2.height / lienzoProcO2.width) + 0.026),
     MineMaterials.plano(0x9a988e, { rough: 0.45, metal: 0.55 })
   );
-  marcoProc.position.set(-1.30, y0 + 1.44, -(A / 2 - t - 0.012) - 0.004);
+  marcoProc.position.set(xProcO2, y0 + 1.44, -(A / 2 - t - 0.012) - 0.004);
   S.add(marcoProc);
 
   // ── SALIDA DE EMERGENCIA (escotilla de escape) ───────────────────
@@ -4440,19 +4930,41 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
     'y bisagras a la derecha. Con la puerta principal bloqueada es la única vía: el ocupante ' +
     'sentado debajo la desbloquea y la mantiene abierta hasta que han salido todos.');
   {
-    const zPared = A / 2 - t - 0.010;
-    // Foto real: la hoja es MÁS ALTA QUE ANCHA y de radio de esquina muy generoso — es una
-    // escotilla de presión, no una tapa de registro rectangular.
-    const escW = 0.66, escH = 0.80, radio = 0.10;
-    const yEsc = y0 + 1.30;                         // sobre el respaldo de la banca
-    const xEsc = -L / 2 + 1.45;                     // al fondo (-X), despejado del testero
+    // -- COSTADO en el que va la escotilla -----------------------------------
+    //  -1 = hastial -Z, que es el que queda a la DERECHA de quien entra y mira al fondo.
+    //  +1 = hastial +Z (el de la izquierda).
+    //  TODO el conjunto cuelga de este signo: el lado de los pomos, hacia donde se hunde el
+    //  rebaje y a donde miran los dos rotulos salen de aqui. Cambiar de costado es cambiar
+    //  este numero — y la hoja interior y el rotulo exterior NO se pueden descuadrar, porque
+    //  ambos son hijos del mismo grupo.
+    const LADO = -1;
+
+    // Altura del vano: subida 15 cm respecto del primer montaje. A y0+1.30 el umbral caía a
+    // y0+0.90, casi rozando el respaldo de la banca (y0+0.84), y la escotilla se leía como una
+    // tapa metida entre los asientos. En las fotos el vano arranca claramente POR ENCIMA del
+    // respaldo: el que escapa pisa la banca y pasa de pie, no a gatas.
+    const ESC = { x: -0.95, y: y0 + 1.45, w: 0.66, h: 0.80, r: 0.10 };
+    const xEsc = ESC.x, yEsc = ESC.y;
+    const escW = ESC.w, escH = ESC.h, radio = ESC.r;
+    const zPared = LADO * (A / 2 - t - 0.010);   // cara INTERIOR del hastial elegido
+
+    // Grupo local de la escotilla: origen en el centro del vano, +Z hacia AFUERA del refugio y
+    // +X a la izquierda del ocupante. Al girarlo 180 grados para el costado -Z, el lado de los
+    // pomos y la orientacion de los rotulos se invierten solos.
+    const gEsc = new THREE.Group();
+    gEsc.name = 'escotilla_emergencia';
+    gEsc.position.set(xEsc, yEsc, zPared);
+    gEsc.rotation.y = LADO > 0 ? 0 : Math.PI;
+    S.add(gEsc);
+
     // Va pintada del MISMO crema que los paneles del refugio, no en acero desnudo: en las fotos
     // la escotilla apenas se distingue del hastial salvo por el marco y los herrajes.
     const mHoja = MineMaterials.plano(0xe3dfd2, { rough: 0.82, metal: 0.06 });
     const mHerraje = MineMaterials.plano(0xf0eee6, { rough: 0.6, metal: 0.25 });
     const mPomo = MineMaterials.plano(0x1a1a18, { rough: 0.45, metal: 0.35 });
+    const mJunta = MineMaterials.plano(0x24242a, { rough: 0.9, metal: 0.05 });
 
-    /** Rectángulo de esquinas redondeadas centrado en el origen (plano XY). */
+    /** Rectangulo de esquinas redondeadas centrado en el origen (plano XY). */
     const formaRedonda = (w, h, r) => {
       const s = new THREE.Shape();
       const x = -w / 2, y = -h / 2;
@@ -4464,66 +4976,84 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
       return s;
     };
 
-    // MARCO: anillo embutido en el hastial (forma exterior con la hoja recortada como hueco).
+    // -- ESCOTILLA EMBUTIDA EN EL HASTIAL ------------------------------------
+    //  Antes la hoja se montaba 6 cm POR DELANTE de la cara del hastial y los pomos asomaban 12
+    //  cm mas: el conjunto no se leia como una escotilla, sino como una plancha crema pegada a
+    //  la pared y flotando sobre la banca. Una escotilla de presion va al reves — la hoja apoya
+    //  contra su junta por DENTRO del vano, y desde la camara se ve HUNDIDA en el rebaje.
+    //
+    //  El hastial tiene 6 cm de panel, asi que el rebaje es necesariamente somero: jamba de 5 cm
+    //  y hoja retranqueada 3.5 cm. Suficiente para que el borde proyecte sombra propia y el ojo
+    //  lea profundidad en vez de un adosado.
+    const JAMBA_D = 0.05, RETRANQUEO = 0.035;
+
+    // JAMBA: anillo que forma el intrados del vano, hacia AFUERA (+Z local) desde la cara interior.
     const marco = formaRedonda(escW + 0.10, escH + 0.10, radio + 0.05);
     marco.holes.push(formaRedonda(escW + 0.012, escH + 0.012, radio));
-    const gMarco = new THREE.ExtrudeGeometry(marco, { depth: 0.045, bevelEnabled: false });
-    const mallaMarco = new THREE.Mesh(gMarco, mHoja);
-    mallaMarco.position.set(xEsc, yEsc, zPared - 0.045);
-    S.add(mallaMarco);
+    const mallaMarco = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(marco, { depth: JAMBA_D, bevelEnabled: false }), mHoja);
+    gEsc.add(mallaMarco);
 
-    // HOJA: chapa maciza de esquinas redondeadas, montada por dentro contra su junta.
-    const gHoja = new THREE.ExtrudeGeometry(formaRedonda(escW, escH, radio), { depth: 0.032, bevelEnabled: false });
-    const hoja = new THREE.Mesh(gHoja, mHoja);
-    hoja.position.set(xEsc, yEsc, zPared - 0.060);
-    S.add(hoja);
+    // JUNTA de estanqueidad: aro oscuro en el fondo del rebaje, contra el que cierra la hoja.
+    const junta = formaRedonda(escW + 0.010, escH + 0.010, radio);
+    junta.holes.push(formaRedonda(escW - 0.045, escH - 0.045, radio * 0.8));
+    const mallaJunta = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(junta, { depth: 0.008, bevelEnabled: false }), mJunta);
+    mallaJunta.position.z = RETRANQUEO - 0.008;
+    gEsc.add(mallaJunta);
 
-    // POMOS DE ENCLAVAMIENTO — a la IZQUIERDA de la hoja SEGÚN LA VE EL OCUPANTE, sobre
-    // pletinas blancas. Ojo con el lado: quien mira este hastial desde dentro está mirando
-    // hacia +Z, así que su izquierda es +X (no -X). Puestos al revés, los pomos quedaban del
-    // lado de las bisagras — la escotilla no se podría abrir.
-    const xPomos = xEsc + escW / 2 + 0.035;
+    // HOJA: chapa maciza RETRANQUEADA dentro del vano (ya no invade la camara).
+    const hoja = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(formaRedonda(escW, escH, radio), { depth: 0.030, bevelEnabled: false }), mHoja);
+    hoja.position.z = RETRANQUEO;
+    gEsc.add(hoja);
+
+    // POMOS DE ENCLAVAMIENTO a la IZQUIERDA del ocupante (+X local, que el giro del grupo lleva
+    // al lado correcto en cada costado). Puestos enfrente quedarian del lado de las bisagras y
+    // la escotilla no se podria abrir. Apenas asoman del plano del hastial: es lo que hace que
+    // se lea hundida y no adosada.
+    const xPomos = escW / 2 + 0.035;
     for (const dy of [0.235, -0.235]) {
-      const pletina = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.13, 0.030), mHerraje);
-      pletina.position.set(xPomos, yEsc + dy, zPared - 0.070);
-      S.add(pletina);
-      const vastago = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 8), mPomo);
+      const pletina = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.13, 0.026), mHerraje);
+      pletina.position.set(xPomos, dy, RETRANQUEO - 0.008);
+      gEsc.add(pletina);
+      const vastago = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.045, 8), mPomo);
       vastago.rotation.x = Math.PI / 2;
-      vastago.position.set(xPomos, yEsc + dy, zPared - 0.098);
-      S.add(vastago);
-      const pomo = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 10), mPomo);
-      pomo.scale.z = 0.75;
-      pomo.position.set(xPomos, yEsc + dy, zPared - 0.122);
-      S.add(pomo);
+      vastago.position.set(xPomos, dy, 0.010);
+      gEsc.add(vastago);
+      const pomo = new THREE.Mesh(new THREE.SphereGeometry(0.030, 12, 10), mPomo);
+      pomo.scale.z = 0.7;
+      pomo.position.set(xPomos, dy, -0.014);
+      gEsc.add(pomo);
     }
 
-    // BISAGRAS enfrente de los pomos (-X): dos pletinas que abrazan el canto de la hoja.
+    // BISAGRAS enfrente de los pomos, dentro del rebaje.
     for (const dy of [0.26, -0.26]) {
-      const bis = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.075, 0.026), mHerraje);
-      bis.position.set(xEsc - escW / 2 + 0.005, yEsc + dy, zPared - 0.074);
-      S.add(bis);
+      const bis = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.075, 0.024), mHerraje);
+      bis.position.set(-escW / 2 + 0.005, dy, RETRANQUEO - 0.006);
+      gEsc.add(bis);
     }
 
-    // PLACA DE INSTRUCCIÓN sobre la escotilla, mirando al interior de la cámara.
+    // PLACA DE INSTRUCCION sobre la escotilla, mirando al interior de la camara.
     const lienzoEsc = _texturaSalidaEmergencia();
     const anchoRot = 0.30;
     const rot = new THREE.Mesh(
       new THREE.PlaneGeometry(anchoRot, anchoRot * (lienzoEsc.height / lienzoEsc.width)),
       new THREE.MeshStandardMaterial({ map: _aTextura(lienzoEsc), roughness: 0.62 })
     );
-    rot.position.set(xEsc, yEsc + escH / 2 + 0.14, zPared - 0.004);
-    rot.rotation.y = Math.PI;                       // se lee DESDE DENTRO
-    S.add(rot);
+    rot.position.set(0, escH / 2 + 0.14, -0.004);
+    rot.rotation.y = Math.PI;                       // -Z local = hacia la camara
+    gEsc.add(rot);
 
-    // ── ROTULACIÓN EXTERIOR, la cara que ve la mina ──────────────────────────
-    //  Hasta ahora la escotilla solo existía por DENTRO (hoja, pomos, bisagras y la placa de
-    //  instrucción, que además va girada π para leerse desde la cámara). Desde la labor, el
-    //  costado del refugio se veía como un panel crema liso con el logo Dräger y nada más.
+    // -- ROTULACION EXTERIOR, la cara que ve la mina -------------------------
+    //  Hasta ahora la escotilla solo existia por DENTRO (hoja, pomos, bisagras y la placa de
+    //  instruccion, que ademas va girada PI para leerse desde la camara). Desde la labor, el
+    //  costado del refugio se veia como un panel crema liso con el logo Drager y nada mas.
     //
-    //  En la foto real es justo al revés: lo que domina ese costado es el MARCO NEGRO de
-    //  esquinas muy redondeadas con SALIDA / DE / EMERGENCIA, y debajo el número de refugio
+    //  En la foto real es justo al reves: lo que domina ese costado es el MARCO NEGRO de
+    //  esquinas muy redondeadas con SALIDA / DE / EMERGENCIA, y debajo el numero de refugio
     //  rotulado a mano. Sin eso, un minero que llega por la labor no tiene forma de saber que
-    //  ahí hay una vía de escape — que es exactamente para lo que está pintado.
+    //  ahi hay una via de escape — que es exactamente para lo que esta pintado.
     const lienzoExt = _texturaSalidaEmergenciaExt(numero);
     const anchoExt = 1.38;
     const extRot = new THREE.Mesh(
@@ -4532,11 +5062,11 @@ export function crear({ ocupado = false, numero = 2 } = {}) {
         map: _aTextura(lienzoExt), transparent: true, roughness: 0.78, metalness: 0.05
       })
     );
-    // Sobre la chapa del costado +Z (la misma cara que lleva el logo), centrado en la escotilla
-    // y bajado un poco: el rótulo a mano cae por debajo del marco, como en la foto.
-    extRot.position.set(xEsc, yEsc - 0.05, A / 2 + t / 2 + 0.008);
+    // Hijo del MISMO grupo que la hoja: las dos caras de la escotilla calzan por construccion,
+    // en el costado que sea. +Z local = hacia afuera, ya sobre la chapa del casco.
+    extRot.position.set(0, -0.05, (A / 2 + t / 2 + 0.008) - (A / 2 - t - 0.010));
     extRot.name = 'rotulo_salida_emergencia_ext';
-    S.add(extRot);
+    gEsc.add(extRot);
   }
 
   // ── VÁLVULAS DE SOBREPRESIÓN ─────────────────────────────────────
