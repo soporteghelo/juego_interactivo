@@ -60,8 +60,8 @@ assert.ok(valvulas, 'Faltan las VÁLVULAS DE SOBREPRESIÓN del esquema general (
 
 const caja = (o) => new THREE.Box3().setFromObject(o);
 const cEsc = caja(escotilla).getCenter(new THREE.Vector3());
-// "Muro izquierdo, al fondo": costado +Z para quien ya entró y mira al interior, hacia -X.
-assert.ok(cEsc.z > 1.0, `La escotilla debe ir en el hastial +Z (z=${cEsc.z.toFixed(2)})`);
+// Costado -Z: el que queda a la DERECHA de quien ya entró y mira al interior (hacia -X).
+assert.ok(cEsc.z < -1.0, `La escotilla debe ir en el hastial -Z (z=${cEsc.z.toFixed(2)})`);
 assert.ok(cEsc.x < 0, `La escotilla debe ir al FONDO del refugio (x=${cEsc.x.toFixed(2)})`);
 // Sobre la banca: el ocupante sentado debajo es quien la abre.
 assert.ok(cEsc.y > 1.1 && cEsc.y < 2.0, `Altura impropia para salir desde la banca (y=${cEsc.y.toFixed(2)})`);
@@ -78,11 +78,11 @@ const normalDe = (o) => new THREE.Vector3(0, 0, 1)
 
 const rotuloExt = planos.find(o => o.name === 'rotulo_salida_emergencia_ext');
 assert.ok(rotuloExt, 'Falta la rotulación EXTERIOR de la escotilla: desde la labor no se ve la vía de escape');
-assert.ok(normalDe(rotuloExt).z > 0, 'La rotulación exterior de la escotilla no mira a la mina');
+assert.ok(normalDe(rotuloExt).z < 0, 'La rotulación exterior de la escotilla no mira a la mina');
 
 const rotuloInt = planos.filter(o => o !== rotuloExt).pop();
 assert.ok(rotuloInt, 'La escotilla debe llevar su rótulo de vía de escape');
-assert.ok(normalDe(rotuloInt).z < 0, 'El rótulo interior de la escotilla mira hacia fuera: no se leería desde dentro');
+assert.ok(normalDe(rotuloInt).z > 0, 'El rótulo interior de la escotilla mira hacia fuera: no se leería desde dentro');
 
 // Las válvulas van altas, en el arranque de la bóveda.
 const cVal = caja(valvulas);
@@ -95,6 +95,81 @@ assert.ok(/40\s*ppm/i.test(fuente), 'Falta el umbral de CO < 40 ppm');
 assert.ok(/0,5\s*l\/min|0\.5\s*l\/min/i.test(fuente), 'Falta el caudal de 0,5 l/min por persona');
 assert.ok(/Drägersorb/.test(fuente), 'Falta la cal sodada Drägersorb® 400 (absorbente de CO2)');
 assert.ok(/ChamberCatalysis/.test(fuente), 'Falta el ChamberCatalysis® (catalizador de CO)');
+
+// ── 5. FRENTE DE LA UnidadREFUGE® — fidelidad a las fotos del panel real ─────
+// El frente se había modelado de memoria: un "paro de emergencia" rojo, un pulsador verde de
+// marcha y un panel blanco impreso con pilotos y diagrama de flujo. Las fotos de cerca del
+// equipo real no muestran nada de eso. Muestran, de la izquierda del operador a su derecha:
+// selector de iluminación, selector de sirena, el controlador Dräger|SIMSA con su LCD magenta,
+// el piloto "Respaldo", el monitor de baterías y el piloto "Línea". Rojo y verde son PILOTOS DE
+// ALIMENTACIÓN, no pulsadores — y un paro de emergencia en la máquina de la que respiran veinte
+// personas encerradas sería un error operacional, no sólo un error de modelo.
+assert.equal(/const paro = /.test(fuente), false,
+  'Volvió el "paro de emergencia" al frente de la UnidadREFUGE®: el rojo de la foto es el piloto "Respaldo"');
+assert.equal(/btnVerde/.test(fuente), false,
+  'Volvió el pulsador verde de marcha: el verde de la foto es el piloto "Línea"');
+assert.equal(/_texturaPanelUnidadRefuge/.test(fuente), false,
+  'Volvió el panel impreso inventado: en la foto los mandos van atornillados sobre la chapa azul');
+
+// Lo que canta el LCD del controlador es dato, no relleno: modelo MRC5000 (el mismo de la placa
+// de identificación), reloj de fábrica sin ajustar y los DOS ventiladores parados en espera.
+assert.ok(/MRC5000/.test(fuente), 'El LCD del controlador debe mostrar el modelo MRC5000');
+assert.ok(/V1 OFF/.test(fuente) && /V2 OFF/.test(fuente),
+  'El LCD debe mostrar los dos ventiladores (V1/V2) parados: la unidad se arranca al encerrarse');
+
+const bpu = sub('bpu');
+assert.ok(bpu, 'Falta la UnidadREFUGE®');
+const porNombre = (n) => { let hit = null; bpu.traverse(o => { if (o.name === n) hit = o; }); return hit; };
+const mandos = ['bpu_controlador', 'bpu_piloto_respaldo', 'bpu_monitor_baterias', 'bpu_piloto_linea']
+  .map((n) => { const o = porNombre(n); assert.ok(o, `Falta el mando "${n}" del frente`); return o; });
+
+// Van EN EL MISMO ORDEN que en la foto. El observador mira la unidad desde +X, así que su
+// izquierda es +Z: de +Z a -Z, controlador → Respaldo → monitor → Línea.
+const zMandos = mandos.map((o) => o.getWorldPosition(new THREE.Vector3()).z);
+for (let i = 1; i < zMandos.length; i++) {
+  assert.ok(zMandos[i] < zMandos[i - 1],
+    `Los mandos del frente no siguen el orden de la foto (z=${zMandos.map(v => v.toFixed(3))})`);
+}
+
+// Ninguno se sale de la chapa: el gabinete mide 0.67 m de ancho y el piloto de Línea es el que
+// queda al filo. Si un mando cuelga fuera del frente, el modelo se delata desde cualquier ángulo.
+// Se miden LOS MANDOS y no la caja del subelemento entero: del costado cuelga la manguera
+// enrollada, que sí puede sobresalir del ancho del gabinete porque va colgada de un gancho.
+const cajaBpu = caja(bpu);
+for (const o of mandos) {
+  const c = caja(o);
+  assert.ok(Math.abs(c.min.z) <= 0.335 && Math.abs(c.max.z) <= 0.335,
+    `El mando "${o.name}" se sale del frente (z=${c.min.z.toFixed(3)}..${c.max.z.toFixed(3)})`);
+}
+
+// Fila de mandos a la altura a la que se opera de pie. Se mide DESDE EL PISO DEL REFUGIO —la
+// base del gabinete— y no desde el piso de la labor: el contenedor va sobre su patín, así que en
+// coordenadas de mundo todo el interior está unos 25 cm más alto de lo que lo ve el ocupante.
+const yPisoBpu = cajaBpu.min.y;
+for (const o of mandos) {
+  const y = o.getWorldPosition(new THREE.Vector3()).y - yPisoBpu;
+  assert.ok(y > 1.0 && y < 1.25, `Mando "${o.name}" a altura impropia para operarlo de pie (y=${y.toFixed(2)})`);
+}
+
+// En la foto SÓLO alumbra el verde: el refugio está en espera, comiendo de la red de mina. Si
+// alumbraran los dos —o el rojo— el jugador leería "refugio en baterías", que es otra situación.
+const matDe = (o) => o.material;
+assert.ok(matDe(porNombre('bpu_piloto_linea')).emissiveIntensity > 0.5,
+  'El piloto LÍNEA debe estar encendido: el refugio en espera cuelga de la red de mina');
+assert.equal(matDe(porNombre('bpu_piloto_respaldo')).emissiveIntensity, 0,
+  'El piloto RESPALDO debe estar apagado mientras haya línea: encendido significa que corre con baterías');
+
+// ── 6. TOLVAS DE CARGA — placa blanca con pestaña, y separadas ───────────────
+// Antes los rótulos eran una banda naranja con letras blancas y las dos tolvas se tocaban. En la
+// foto son placas BLANCAS con pestaña de color en el canto —naranja el absorbente, verde el
+// catalizador— y entre los cajones queda una luz por la que asoma la brida que los amarra.
+assert.equal(/_texturaTolva\b/.test(fuente), false,
+  'Volvió la banda naranja de las tolvas: en la foto el rótulo es una placa blanca con pestaña');
+const rotulos = [];
+bpu.traverse(o => { if (o.name === 'bpu_rotulo_tolva') rotulos.push(o); });
+assert.equal(rotulos.length, 2, 'Deben ir DOS tolvas rotuladas: absorbente de CO2 y humedad/catalizador');
+const zRot = rotulos.map((o) => o.getWorldPosition(new THREE.Vector3()).z).sort((a, b) => a - b);
+assert.ok(zRot[1] - zRot[0] > 0.28, `Las tolvas quedaron pegadas (separación ${(zRot[1] - zRot[0]).toFixed(3)} m)`);
 
 // El guion del recorrido no debe apuntar a subelementos inexistentes (se filtran en silencio).
 const ids = new Set();
@@ -113,6 +188,11 @@ console.log(JSON.stringify({
     rotuloLegibleDesdeDentro: true
   },
   valvulasSobrepresion: { alturaMax: +cVal.max.y.toFixed(2) },
+  unidadRefuge: {
+    mandosDelFrente: mandos.map((o) => o.name),
+    pilotoEncendido: 'Línea (red de mina)',
+    tolvas: { separacion: +(zRot[1] - zRot[0]).toFixed(3) }
+  },
   subelementos: ids.size,
   mallas
 }, null, 2));

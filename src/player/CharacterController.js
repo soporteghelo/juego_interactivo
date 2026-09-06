@@ -18,6 +18,9 @@ export class CharacterController {
 
     this.verticalVelocity = 0;
     this.grounded = false;
+    // Velocidad de caida (m/s, positiva) del frame EXACTO en que se toca el piso; 0 el resto
+    // del tiempo. La camara la usa para hundirse al aterrizar. La consume el Player.
+    this.landingImpact = 0;
     this.gravity = -18;       // un poco mas que 9.81 para un salto "gameplay"
     this.jumpSpeed = 6.2;
 
@@ -50,7 +53,15 @@ export class CharacterController {
 
     this.controller.computeColliderMovement(this.collider, desired);
     const corrected = this.controller.computedMovement();
+    const estabaEnSuelo = this.grounded;
     this.grounded = this.controller.computedGrounded();
+
+    // IMPACTO DE ATERRIZAJE: hay que leer la velocidad de caida AQUI, antes de que la linea de
+    // abajo la aplaste a -1 para mantener la capsula pegada al piso. El umbral de 2 m/s deja
+    // pasar los desniveles del piso irregular sin sacudir la camara en cada bache.
+    this.landingImpact = (!estabaEnSuelo && this.grounded && this.verticalVelocity < -2)
+      ? -this.verticalVelocity
+      : 0;
 
     if (this.grounded && this.verticalVelocity < 0) {
       this.verticalVelocity = -1; // mantener pegado al piso
@@ -77,5 +88,8 @@ export class CharacterController {
     this.body.setNextKinematicTranslation(target);
     this.verticalVelocity = 0;
     this.grounded = false;
+    // Velocidad de caida (m/s, positiva) del frame EXACTO en que se toca el piso; 0 el resto
+    // del tiempo. La camara la usa para hundirse al aterrizar. La consume el Player.
+    this.landingImpact = 0;
   }
 }

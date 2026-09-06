@@ -34,6 +34,7 @@ import * as jumbo from './equipos/jumbo.js';
 import * as raptor from './equipos/raptor.js';
 import * as scoop from './equipos/scoop.js';
 import * as empernador from './equipos/empernador.js';
+import * as empernadorGlb from './equipos/empernador_glb.js';
 import * as shotcretera from './equipos/shotcretera.js';
 import * as mixer from './equipos/mixer.js';
 import * as desatador from './equipos/desatador.js';
@@ -127,7 +128,9 @@ export const CATALOGO = [
   { id: 'jumbo', nombre: 'Jumbo de perforacion', descripcion: jumbo.meta.descripcion, crear: () => jumbo.crear() },
   { id: 'raptor', nombre: raptor.meta.nombre, descripcion: raptor.meta.descripcion, crear: () => raptor.crear() },
   { id: 'scoop', nombre: scoop.meta.nombre, descripcion: scoop.meta.descripcion, crear: () => scoop.crear() },
-  { id: 'empernador', nombre: empernador.meta.nombre, descripcion: empernador.meta.descripcion, crear: () => empernador.crear() },
+  // El VISOR muestra la variante GLB (malla externa optimizada). La MINA sigue armando el
+  // empernador procedural: RoomSegment.js importa `empernador.js` directo, no pasa por aqui.
+  { id: 'empernador', nombre: empernadorGlb.meta.nombre, descripcion: empernadorGlb.meta.descripcion, crear: () => empernadorGlb.crear() },
   { id: 'desatador', nombre: desatador.meta.nombre, descripcion: desatador.meta.descripcion, crear: () => desatador.crear() },
   { id: 'shotcretera', nombre: shotcretera.meta.nombre, descripcion: shotcretera.meta.descripcion, crear: () => shotcretera.crear() },
   { id: 'mixer', nombre: mixer.meta.nombre, descripcion: mixer.meta.descripcion, crear: () => mixer.crear() },

@@ -162,9 +162,10 @@ function mostrar(index) {
   tour.detener(false);
 
   if (actual) {
-    // El minero FBX comparte geometría/materiales entre clones (SkeletonUtils.clone):
+    // El minero FBX comparte geometría/materiales entre clones (SkeletonUtils.clone), y lo
+    // mismo hacen los elementos cargados de un GLB cacheado (`userData.compartido`):
     // NO se debe disposear o romperíamos los siguientes clones. Solo se quita de la escena.
-    if (actual.userData?.anim) actual.parent?.remove(actual);
+    if (actual.userData?.anim || actual.userData?.compartido) actual.parent?.remove(actual);
     else disposeObject(actual);
     actual = null;
   }
@@ -192,6 +193,21 @@ function mostrar(index) {
 
   encuadrar(actual);
   actualizarInfo();
+  // Elementos con malla externa (GLB) llegan asincronos: al `crear()` solo hay un proxy de
+  // medidas. Cuando la malla real entra, se vuelve a encuadrar y a medir — salvo que el
+  // usuario ya haya cambiado de elemento mientras cargaba.
+  obj.userData?.listo?.then(() => {
+    if (actual !== obj) return;
+    obj.traverse((c) => { if (c.userData?.tick) animados.push(c.userData.tick); });
+    subGrupos = recolectarSubelementos(obj);
+    aplicarWireframe();
+    // Volver a 0 antes de medir: el auto-giro ya movió el objeto, y la caja alineada a ejes
+    // de una máquina larga girada se ensancha (11 m a 26° dan 7.9 m de "ancho" falso).
+    obj.rotation.y = 0;
+    obj.updateMatrixWorld(true);
+    encuadrar(obj);
+    actualizarInfo();
+  });
   actualizarBtnTour();
   guardarSeleccion();
   pintarLista(search.value);

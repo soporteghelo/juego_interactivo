@@ -21,7 +21,9 @@ export class Player {
     this.bus = bus;
 
     this.controller = new CharacterController(physics, spawn);
-    this.rig = new CameraRig(camera);
+    // El rig recibe el bus: emite `player:paso` en cada contacto de talon y con eso el
+    // AudioManager coloca la pisada donde el ojo la ve, no con un temporizador aparte.
+    this.rig = new CameraRig(camera, bus);
     this.headlamp = new Headlamp(camera, scene, bus);
 
     this.walkSpeed = 3.0;
@@ -106,7 +108,27 @@ export class Player {
 
     const pos = this.controller.position;
     const crouching = this.input.isDown('crouch');
-    this.rig.update(pos, crouching);
+
+    // VELOCIDAD REAL de avance (desplazamiento medido / dt), no la deseada: si el jugador empuja
+    // contra un hastial no avanza, y ni la camara debe cabecear ni deben sonar pisadas. Se
+    // calcula SIEMPRE (antes solo se hacia dentro del bloque del avatar en 3a persona).
+    if (!this._avatarLast) this._avatarLast = { x: pos.x, z: pos.z };
+    const velReal = dt > 1e-5
+      ? Math.hypot(pos.x - this._avatarLast.x, pos.z - this._avatarLast.z) / dt
+      : 0;
+    this._avatarLast.x = pos.x; this._avatarLast.z = pos.z;
+
+    // El impacto de aterrizaje es de UN frame: se consume aqui para que no se repita.
+    const impacto = this.controller.landingImpact;
+    this.controller.landingImpact = 0;
+
+    this.rig.update(pos, crouching, {
+      dt,
+      velocidad: velReal,
+      corriendo: this.input.isDown('run'),
+      enSuelo: this.controller.grounded,
+      impacto
+    });
     this.headlamp.update();
 
     // Avatar (solo visible en 3a persona). Pies a ras de piso (capsula: centro - 1.05).
@@ -119,10 +141,7 @@ export class Player {
       const mv = this.input.move;
       const moviendo = this.input.enabled && (Math.abs(mv.x) + Math.abs(mv.y)) > 0.15;
       const corriendo = this.input.isDown('run');
-      if (!this._avatarLast) this._avatarLast = { x: pos.x, z: pos.z };
-      const vel = dt > 1e-5 ? Math.hypot(pos.x - this._avatarLast.x, pos.z - this._avatarLast.z) / dt : 0;
-      this._avatarLast.x = pos.x; this._avatarLast.z = pos.z;
-      actualizarMinero(this.mesh, dt, moviendo, corriendo, vel);
+      actualizarMinero(this.mesh, dt, moviendo, corriendo, velReal);
     }
 
     // Notifica posicion para streaming/audio (a ~10 Hz). `pie:true` distingue la marcha

@@ -126,6 +126,22 @@ export class WorldRuntime {
    * Nicho de refugio peatonal mas cercano (distancia XZ) dentro de `maxDist`, o null. Lo usan
    * los NPC para meterse en el nicho cuando se acerca un equipo pesado.
    */
+  /**
+   * Grado de encharcado (0..1) de la labor que se esta pisando.
+   *
+   * Cada tramo sortea el suyo al construirse (`BaseSegment._buildFloor`): unas vias quedan
+   * secas-embarradas y las mas bajas MEDIO INUNDADAS, con lamina de agua sobre la calzada. El
+   * dato existia desde siempre pero solo lo usaba la geometria; asi el jugador cruzaba un tramo
+   * anegado sonando y salpicando igual que uno seco.
+   *
+   * Se resuelve por el segmento de centro mas proximo. En un tramo largo el centro puede quedar
+   * a decenas de metros, pero los tramos vecinos comparten drenaje, asi que el valor sigue
+   * siendo representativo del charco que se esta pisando.
+   */
+  mojadoActual() {
+    return this.tramoActual?.encharcado ?? 0;
+  }
+
   nearestRefuge(pos, maxDist = 14) {
     const list = this.refugeNiches;
     if (!list || !list.length) return null;
@@ -274,8 +290,13 @@ export class WorldRuntime {
     // implica. Con dos umbrales separados el cambio ocurre una vez y no oscila.
     const entrar = Settings.current.drawDistance + 16;
     const salir  = Settings.current.drawDistance + 26;
+    // TRAMO ACTUAL: sale GRATIS de este bucle, que ya mide la distancia a cada segmento. Lo usan
+    // la salpicadura y el sonido de pisada para saber sobre que esta caminando el jugador — cada
+    // labor tiene su propio grado de encharcado (`seg.encharcado`) y hasta ahora nadie lo leia.
+    let mejorD = Infinity, mejorSeg = null;
     for (const seg of this.segments) {
       const d = seg._center.distanceTo(this._playerPos);
+      if (d < mejorD) { mejorD = d; mejorSeg = seg; }
       const visible = seg.group.visible ? d < salir : d < entrar;
       this._mostrar(seg, visible);
       if (!visible) continue;
@@ -284,6 +305,8 @@ export class WorldRuntime {
         for (const obj of seg.animated) obj.userData.tick?.(dt, elapsed);
       }
     }
+
+    this.tramoActual = mejorSeg;
 
     // Pool de luces: reasigna las luces reales a las fuentes mas cercanas ~cada 0.12 s.
     // No cada frame (el sort es innecesario a 60 Hz) y los cambios ocurren tras la niebla.

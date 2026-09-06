@@ -29,6 +29,7 @@ import { WorkFX } from '../particles/WorkFX.js';
 import { VentFlowSystem } from '../particles/VentFlowSystem.js';
 import { VaporSystem } from '../particles/VaporSystem.js';
 import { DripSystem } from '../particles/DripSystem.js';
+import { SalpicaduraSystem } from '../particles/salpicadura.js';
 import { WorkSiteSystem } from '../world/WorkSiteSystem.js';
 import { WorkCrewSystem } from '../world/WorkCrewSystem.js';
 import { ActoresLod } from '../world/ActoresLod.js';
@@ -315,6 +316,11 @@ export class Engine {
     this.vapor = new VaporSystem({ scene: this.scene, world: this.world, settings: Settings, bus: this.bus });
     // Goteo VISIBLE de agua desde la boveda (rizo al impactar) sincronizado con el ploc del audio.
     this.drips = new DripSystem({ scene: this.scene, settings: Settings, bus: this.bus, audio: this.audio });
+    // Salpicadura de la bota en las vias anegadas: ademas de las gotas, es quien le dice al
+    // audio cuanta agua hay bajo los pies (conoce el mundo; el AudioManager no).
+    this.salpicadura = new SalpicaduraSystem({
+      scene: this.scene, settings: Settings, bus: this.bus, world: this.world, audio: this.audio
+    });
 
     await tick();
     Perf.marca('interfaz + NPC + postFX');
@@ -367,6 +373,7 @@ export class Engine {
     this.loop.add(this.ventFlow);    // penacho de aire en la boca de la manga mas cercana
     this.loop.add(this.vapor);       // vaho/condensacion en las labores calurosas
     this.loop.add(this.drips);       // goteo visible desde la boveda (dispara el ploc del audio)
+    this.loop.add(this.salpicadura); // agua que levanta la bota en las vias anegadas
     this.loop.add(this.audio);
     this.loop.add(this.hud);
     this.loop.add(this.minimap);

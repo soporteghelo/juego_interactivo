@@ -41,6 +41,8 @@ export class AudioManager {
     // Pasos: velocidad del jugador estimada de los eventos 'player:moved' (tag pie:true).
     this._stepTimer = 0;
     this._stepSide = 1;
+    this._pasoPorEvento = 0;   // s restantes de confianza en los eventos de marcha
+    this._mojado = 0;          // agua bajo los pies (0..1), la empuja SalpicaduraSystem
     this._pSpeed = 0;
     this._pPrev = null;
     this._pPrevT = 0;
@@ -53,6 +55,13 @@ export class AudioManager {
     this.bus.on('audio:horn', (e) => this._horn(e?.position));
     this.bus.on('audio:reverseBeep', (e) => this._reverseBeep(e?.position));
     this.bus.on('player:moved', (e) => this._onPlayerMoved(e));
+    // La PISADA la marca la marcha de la camara (CameraRig), no un temporizador de audio: asi
+    // suena exactamente cuando el ojo ve bajar el cuerpo. `_pasoPorEvento` desactiva la cadencia
+    // interna, que se conserva de respaldo para cuando no llegan eventos (p. ej. conduciendo).
+    this.bus.on('player:paso', (e) => {
+      this._pasoPorEvento = 2.0;
+      this._step(e?.velocidad ?? this._pSpeed, this._mojado);
+    });
 
     // Equipo conducido por el jugador: su motor esta ENCENDIDO aunque este detenido.
     this._driven = null;
@@ -65,6 +74,12 @@ export class AudioManager {
 
   /** Vehiculos cuyo motor debe oirse al acercarse (meshes con userData._speed). */
   setVehicles(meshes) { this._vehicles = meshes || []; }
+
+  /**
+   * Agua bajo los pies (0..1) para el timbre de la pisada. La empuja `SalpicaduraSystem`, que es
+   * quien conoce la topologia; asi el audio no tiene que preguntarle nada al mundo.
+   */
+  setMojado(v) { this._mojado = Math.min(1, Math.max(0, v || 0)); }
 
   /** Debe llamarse tras un gesto del usuario (politica de autoplay). */
   resume() {
@@ -300,7 +315,13 @@ export class AudioManager {
   }
 
   /** Pisada sobre terreno humedo: rafaga grave filtrada + golpe sordo del taco de la bota. */
-  _step(speed) {
+  /**
+   * Pisada. `mojado` (0..1) es el grado de encharcado de la labor que se esta pisando: la mina
+   * tiene tramos secos-embarrados y tramos MEDIO INUNDADOS (ver `encharcado` en BaseSegment), y
+   * cruzarlos sonando igual era una de las cosas que aplanaban el recorrido. Con agua, la bota
+   * levanta un chapoteo: mas agudo, mas largo y con cola, en vez del golpe sordo del barro.
+   */
+  _step(speed, mojado = 0) {
     const ctx = this.ctx;
     const t = ctx.currentTime;
     this._stepSide *= -1;
@@ -308,24 +329,26 @@ export class AudioManager {
     pan.pan.value = this._stepSide * 0.13;
     const vol = Math.min(0.11, 0.045 + speed * 0.012) * (0.85 + Math.random() * 0.3);
 
-    // Rafaga de pisada (grava/barro humedo)
+    // Rafaga de pisada. Seca = grava/barro (paso-bajo grave y corto); mojada = chapoteo (el
+    // filtro se abre hacia agudos y la cola se alarga, que es lo que suena a agua desplazada).
     const nz = ctx.createBufferSource(); nz.buffer = this._noiseBuffer();
-    nz.playbackRate.value = 0.8 + Math.random() * 0.35;
+    nz.playbackRate.value = (0.8 + Math.random() * 0.35) * (1 + mojado * 0.5);
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
-    lp.frequency.value = 520 + Math.random() * 260;
+    lp.frequency.value = (520 + Math.random() * 260) * (1 + mojado * 3.2);
+    const cola = 0.085 + mojado * 0.16;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+    g.gain.exponentialRampToValueAtTime(vol * (1 + mojado * 0.35), t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + cola);
     nz.connect(lp).connect(g).connect(pan);
-    nz.start(t); nz.stop(t + 0.12);
+    nz.start(t); nz.stop(t + cola + 0.04);
 
     // Golpe sordo (peso del cuerpo)
     const th = ctx.createOscillator();
     th.frequency.setValueAtTime(95, t);
     th.frequency.exponentialRampToValueAtTime(55, t + 0.05);
     const tg = ctx.createGain();
-    tg.gain.setValueAtTime(vol * 0.6, t);
+    tg.gain.setValueAtTime(vol * 0.6 * (1 - mojado * 0.55), t);
     tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
     th.connect(tg).connect(pan);
     th.start(t); th.stop(t + 0.08);
@@ -499,8 +522,11 @@ export class AudioManager {
       this._dripTimer = 6 + Math.random() * 8;
     }
 
-    // Pasos: cadencia segun velocidad de marcha (zancada ~1.6 m caminando).
-    if (this._pSpeed > 0.5) {
+    // Pasos de RESPALDO: solo si la marcha de la camara no esta emitiendo `player:paso` (por
+    // ejemplo conduciendo el scoop, donde no hay zancada). Mientras lleguen eventos, manda el
+    // ojo: la pisada suena cuando el cuerpo baja, no cuando vence un temporizador.
+    this._pasoPorEvento = Math.max(0, this._pasoPorEvento - dt);
+    if (this._pasoPorEvento <= 0 && this._pSpeed > 0.5) {
       this._stepTimer -= dt;
       if (this._stepTimer <= 0) {
         this._step(this._pSpeed);
